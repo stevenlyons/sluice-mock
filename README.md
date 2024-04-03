@@ -18,8 +18,8 @@ You specify how a video plays by providing a playback specification in the path 
 video manifest file. A playback manifest will be created and each action will be taken 
 for the specified segment.
 
-A specification looks something like this:
-'s5-p30-e404'
+A specification looks something like this: 's5-p30-e404'
+
 Each action is separated by a '-', the entire url looks like this:
 http://localhost:3000/s5-p30-e404/media.m3u8
 
