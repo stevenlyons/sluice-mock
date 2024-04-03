@@ -10,13 +10,16 @@ This is a Next.js app with MDX (MDX is markdown + react).
 1. `git clone`
 1. `yarn install`
 1. `node app.js`
+1. Browse to http://localhost:3000/index.html
 
 ## Usage
 
-You specify how a video plays by providing a playback specification in the path to the video manifest file. A playback manifest will be created and each action will be taken for the specified segment. 
+You specify how a video plays by providing a playback specification in the path to the 
+video manifest file. A playback manifest will be created and each action will be taken 
+for the specified segment.
 
 A specification looks something like this:
-'s5-p30-e404' 
+'s5-p30-e404'
 Each action is separated by a '-', the entire url looks like this:
 http://localhost:3000/s5-p30-e404/media.m3u8
 
@@ -24,7 +27,7 @@ The following options are available:
 * Startup Time delay: 's' + delay time (optional, defaults to 5 seconds)
 * Playback: 'p' + playback time (optional, defaults to 30 seconds)
 * Rebuffer: 'r' + delay time (optional, defaults to 30 seconds)
-  - Note: "rebuffer of X seconds" does not translate to that amount of rebuffering, it just delays the segment for X seconds
+  - Note: "rebuffer of X seconds" does not translate to exactly X seconds of rebuffering, it delays delivery of the segment for X seconds
 * Error: 'e' + error code (optional, defaults to code 500)
 
 Some examples of playback specifications:
@@ -36,3 +39,7 @@ http://localhost/p10-r9-p10/media.m3u8
 
 500 Server Error to end the stream:
 http://localhost/p30-e/media.m3u8
+
+### Playing
+
+Use the url, including the desired specification, with your favorite video player.
