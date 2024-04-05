@@ -2,6 +2,7 @@ const Koa = require('koa');
 const fs = require('fs');
 const app = module.exports = new Koa();
 const path = require('path');
+const throttle = require('koa-throttle2');
 const extname = path.extname;
 
 // Segment length is 5 seconds
@@ -106,8 +107,8 @@ async function processSegment(ctx, timeline, time) {
   if (segment) {
     // Delayed playback for startup or rebuffer
     if (segment.delay > 0) {
-      await sleep(segment.delay);
-      await outputFile(ctx, '/media', filename);
+      //await sleep(segment.delay);
+      await outputFile(ctx, '/media', filename, segment.delay);
     } 
 
     // Throw an Error
@@ -258,7 +259,9 @@ function outputError(ctx, code) {
   ctx.throw(code);
 }
 
-async function outputFile(ctx, filepath, filename) {
+// const throttler = throttle({rate: 100, chunk: 15000});
+// await throttler(ctx, () => {;});
+async function outputFile(ctx, filepath, filename, delay = 0) {
   const fpath = path.join(__dirname, filepath, filename);
   const fstat = await stat(fpath);
 
@@ -269,6 +272,12 @@ async function outputFile(ctx, filepath, filename) {
     ctx.type = ext;
     ctx.length = fstat.size;
     ctx.body = fs.createReadStream(fpath);
+
+    if (delay > 0) {
+      const chunk = (fstat.size / 10) / delay;
+      const throttler = throttle({rate: 100, chunk: chunk});
+      await throttler(ctx, () => {;});  
+    }
   }
 }
 
