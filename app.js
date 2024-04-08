@@ -12,7 +12,7 @@ app.use(async ctx => {
     const filepath = path.dirname(ctx.path);
     const filename = path.basename(ctx.path);
 
-    //console.log(`none: path: ${filepath} name: ${filename}`);  
+    console.log(`Request: path: ${filepath} name: ${filename}`);  
 
     if (shouldIgnoreRequest(filename)) return;
     
