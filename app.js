@@ -3,10 +3,13 @@ const fs = require('fs');
 const app = module.exports = new Koa();
 const path = require('path');
 const throttle = require('koa-throttle2');
-const extname = path.extname;
 
 // Segment length is 5 seconds
 const segmentLength = 5;
+
+// Caches
+var specCache = {};
+var timelineCache = {};
 
 app.use(async ctx => {
     const filepath = path.dirname(ctx.path);
@@ -16,7 +19,7 @@ app.use(async ctx => {
 
     if (shouldIgnoreRequest(filename)) return;
     
-    const operations = parseSpecification(filepath);
+    const operations = specCache[filepath] ||= parseSpecification(filepath);
 
     switch (checkRequestType(filename)) {
       case 'media':
@@ -28,16 +31,17 @@ app.use(async ctx => {
       case 'rendition':
         console.log('Rendition request');
 
-        // generate rendition based on specification in request
+        // Generate rendition based on specification in request
         const mediaLength = calculateMediaLength(operations);
         await generateRendition(ctx, mediaLength);
         break;
       case 'segment':
         console.log('Segment request');
 
-        // interpolate the file request, figure out the progress in the video session
+        // Build the session timeline
+        const timeline = timelineCache[filepath] ||= createSegmentTimeline(operations);
+        // Calculate the current progress in the video session
         const time = calculateElapsedPlayheadTime(filename);
-        const timeline = createSegmentTimeline(operations);
 
         // take appropriate action
         await processSegment(ctx, timeline, time);
@@ -140,6 +144,7 @@ function parseSpecification(path) {
     }
   }
 
+  console.log('parseSpecification: ' + path);
   console.dir(ops);
   return ops;
 }
@@ -222,6 +227,8 @@ function createSegmentTimeline(operations) {
     }
   }
   
+  console.log('createSegmentTimeline:');
+  console.dir(timeline);
   return timeline;
 }
 
@@ -266,7 +273,7 @@ async function outputFile(ctx, filepath, filename, delay = 0) {
   const fstat = await stat(fpath);
 
   if (fstat.isFile()) {
-    const temp = extname(fpath);
+    const temp = path.extname(fpath);
     var ext = temp.charAt(0) === '.' ? extractMimetype(temp.substring(1)) : temp;
 
     ctx.type = ext;
@@ -274,8 +281,10 @@ async function outputFile(ctx, filepath, filename, delay = 0) {
     ctx.body = fs.createReadStream(fpath);
 
     if (delay > 0) {
+      // Calculate the number of bits per 100ms interval to throttle the file to the specified time 
       const chunk = (fstat.size / 10) / delay;
       const throttler = throttle({rate: 100, chunk: chunk});
+      // Throttle the response, pass a no-op function for the expected `next()`
       await throttler(ctx, () => {;});  
     }
   }
