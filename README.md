@@ -30,13 +30,13 @@ The following options are available:
 
 Some examples of playback specifications:
 Long startup (5 second startup delay and then regular playback):
-http://localhost/s5-p30/media.m3u8
+http://localhost:3000/s5-p30/media.m3u8
 
 Stalling during the video (10 seconds of playback, 9 seconds of delay, 10 more seconds of playback):
-http://localhost/p10-r9-p10/media.m3u8
+http://localhost:3000/p10-r9-p10/media.m3u8
 
 500 Server Error to end the stream:
-http://localhost/p30-e/media.m3u8
+http://localhost:3000/p30-e/media.m3u8
 
 ### Playing
 
