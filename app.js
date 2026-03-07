@@ -21,8 +21,8 @@ app.use(async ctx => {
     if (shouldIgnoreRequest(filename)) return;
 
     if (!specCache[filepath]) {
-        specCache[filepath] = parseSpecification(filepath);
-        console.log('parseSpecification: ' + filepath);
+        specCache[filepath] = await loadSpecification(filepath);
+        console.log('loadSpecification: ' + filepath);
         console.dir(specCache[filepath]);
     }
     const operations = specCache[filepath];
@@ -66,6 +66,19 @@ app.use(async ctx => {
 
 const port = parseInt(process.argv[2]) || 3030;
 if (require.main === module) app.listen(port, () => console.log(`Listening on port ${port}`));
+
+module.exports.loadSpecification = loadSpecification;
+
+async function loadSpecification(filepath) {
+  const name = filepath.startsWith('/') ? filepath.substring(1) : filepath;
+  const specFile = path.join(__dirname, 'specs', `${name}.json`);
+  try {
+    const contents = await fs.promises.readFile(specFile, 'utf8');
+    return JSON.parse(contents).operations;
+  } catch {
+    return parseSpecification(filepath);
+  }
+}
 
 // Request handlers
 

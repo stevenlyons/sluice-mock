@@ -51,6 +51,30 @@ Stalling during the video (10 seconds of playback, 9 seconds of delay, 10 more s
 - HLS: `http://localhost:3030/p30-e/media.m3u8`
 - DASH: `http://localhost:3030/p30-e/media.mpd`
 
+### Named Spec Files
+
+Instead of an inline spec string, you can reference a named JSON file stored in the `specs/` directory. This is useful for sharing, version-controlling, and reusing complex scenarios.
+
+Create `specs/my-scenario.json`:
+
+```json
+{
+  "description": "5s startup delay, 30s playback, then 404 error",
+  "operations": [
+    { "op": "startup", "delay": 5 },
+    { "op": "playback", "time": 30 },
+    { "op": "error", "code": 404 }
+  ]
+}
+```
+
+Then reference it by name in the URL:
+
+- HLS: `http://localhost:3030/my-scenario/media.m3u8`
+- DASH: `http://localhost:3030/my-scenario/media.mpd`
+
+If no matching file is found in `specs/`, the path is treated as an inline spec string.
+
 ### Playing
 
 Use the url, including the desired specification, with your favorite video player.
