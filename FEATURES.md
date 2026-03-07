@@ -1,3 +1,3 @@
 # Features
 
-- [ ] File-based Specifications (`docs/tdd/file-specifications.md`)
+- [x] File-based Specifications (`docs/tdd/file-specifications.md`)

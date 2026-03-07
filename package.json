@@ -3,7 +3,7 @@
   "version": "0.2",
   "scripts": {
     "start": "node app.js",
-    "test": "node --test lib/logic.test.js"
+    "test": "node --test lib/logic.test.js app.test.js"
   },
   "dependencies": {
     "koa": "^3.1.2",
