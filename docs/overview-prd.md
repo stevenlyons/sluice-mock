@@ -29,8 +29,10 @@ for the specified segment.
 
 A specification looks like: 's5-p30-e404'
 
-Each action is separated by a '-', the entire url looks like this:
-http://localhost:3000/s5-p30-e404/media.m3u8
+Each action is separated by a '-'. The protocol is determined by the manifest extension: `.m3u8` for HLS, `.mpd` for DASH.
+
+HLS: `http://localhost:3000/s5-p30-e404/media.m3u8`
+DASH: `http://localhost:3000/s5-p30-e404/media.mpd`
 
 The following options are available:
 * Startup Time delay: 's' + delay time (optional, defaults to 5 seconds)
@@ -41,13 +43,16 @@ The following options are available:
 
 Some examples of playback specifications:
 Long startup (5 second startup delay and then regular playback):
-http://localhost:3000/s5-p30/media.m3u8
+- HLS: `http://localhost:3000/s5-p30/media.m3u8`
+- DASH: `http://localhost:3000/s5-p30/media.mpd`
 
 Stalling during the video (10 seconds of playback, 9 seconds of delay, 10 more seconds of playback):
-http://localhost:3000/p10-r9-p10/media.m3u8
+- HLS: `http://localhost:3000/p10-r9-p10/media.m3u8`
+- DASH: `http://localhost:3000/p10-r9-p10/media.mpd`
 
 500 Server Error to end the stream:
-http://localhost:3000/p30-e/media.m3u8
+- HLS: `http://localhost:3000/p30-e/media.m3u8`
+- DASH: `http://localhost:3000/p30-e/media.mpd`
 
 
 ## High-level Architecture

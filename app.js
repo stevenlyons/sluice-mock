@@ -39,6 +39,12 @@ app.use(async ctx => {
         const mediaLength = calculateMediaLength(operations);
         await generateRendition(ctx, mediaLength);
         break;
+      case 'dash-manifest':
+        console.log('DASH manifest request');
+
+        const dashLength = calculateMediaLength(operations);
+        await generateDashMPD(ctx, dashLength);
+        break;
       case 'segment':
         console.log('Segment request');
 
@@ -82,6 +88,25 @@ ${i}.ts`;
   }
 
   outputString(ctx, 'application/x-mpegURL', start + segments + end);
+}
+
+async function generateDashMPD(ctx, mediaLength) {
+  const mpd =
+`<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011"
+     type="static"
+     mediaPresentationDuration="PT${mediaLength}S"
+     minBufferTime="PT2S">
+  <Period>
+    <AdaptationSet mimeType="video/mp4" segmentAlignment="true">
+      <Representation id="1" bandwidth="2493700" codecs="avc1.640020" width="1280" height="720">
+        <SegmentTemplate media="$Number$.m4s" duration="5" timescale="1" startNumber="0"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>`;
+
+  outputString(ctx, 'application/dash+xml', mpd);
 }
 
 async function processSegment(ctx, timeline, time) {
