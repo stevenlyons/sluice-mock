@@ -1,7 +1,7 @@
 # Video DVR
 
-Specify the behavior of an HLS-based video so it has the configured playback responses. 
-It is useful for testing player playback behavior and measurement SDKs.
+Specify the behavior of an HLS-based video stream with configured playback responses. 
+This is useful for testing video player playback behavior and video player SDK functionality.
 
 ## Development
 
