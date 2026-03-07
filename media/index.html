@@ -9,8 +9,7 @@
     p {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Arial; color: #ffffff}
     a {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Arial; color: #ffffff}
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script src="https://src.litix.io/core/5/mux.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.15/dist/hls.js"></script>
 </head>
 
 <body>
@@ -26,44 +25,23 @@
   const searchParams = new URLSearchParams(window.location.search);
   const spec = searchParams.get('spec') || 'p5-r9-p30';
 
-  // Initialize Mux Data monitoring
-  if (typeof mux !== 'undefined') {
-    var vid = document.querySelector('#myVideo');
-    if (Hls.isSupported()) {
-      var hls = new Hls({ autoStartLoad: false });
-      hls.loadSource('http://localhost:3000/' + spec + '/media.m3u8');
-      hls.attachMedia(vid);
-    }
+  const video = document.querySelector('#myVideo');
+  const videoSrc = window.location.origin + '/' + spec + '/media.m3u8';
 
-    function onPlay(event) {
-      hls.startLoad()
-      vid.removeEventListener(opPlay);
-    }
-
-    vid.addEventListener("play", onPlay);
-    
-    mux.monitor('#myVideo', {
-      debug: true,
-      
-      // Pass in the HLS.js instance
-      hlsjs: hls,
-      
-      // Optionally, if Hls is not available on the window globally
-      // you need to pass Hls as well.
-      Hls: Hls,
-      
-      data: {
-        //env_key: ..., 
-
-        // Metadata
-        player_name: 'Main Player', // ex: 'My Main Player'
-        video_id: '12345',
-        video_title: 'Morning Brew',
-        player_name: 'HLS.JS Player',
-
-        // ... and other metadata
-      }
-    });
+  if (Hls.isSupported()) {
+    let hls = new Hls();
+    hls.loadSource(videoSrc);
+    hls.attachMedia(video);
+  }
+  // HLS.js is not supported on platforms that do not have Media Source
+  // Extensions (MSE) enabled.
+  //
+  // When the browser has built-in HLS support (check using `canPlayType`),
+  // we can provide an HLS manifest (i.e. .m3u8 URL) directly to the video
+  // element through the `src` property. This is using the built-in support
+  // of the plain video element, without using HLS.js.
+  else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = videoSrc;
   }
 
 </script>
