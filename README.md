@@ -10,6 +10,14 @@ It is useful for testing player playback behavior and measurement SDKs.
 1. `node app.js`
 1. Browse to http://localhost:3000/index.html
 
+## Testing
+
+```
+yarn test
+```
+
+Tests cover the pure logic functions in `lib/logic.js` using the Node.js built-in test runner.
+
 ## Usage
 
 You specify how a video plays by providing a playback specification in the path to the 
