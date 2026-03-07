@@ -64,7 +64,8 @@ app.use(async ctx => {
     }
 });
 
-if (require.main === module) app.listen(3000);
+const port = parseInt(process.argv[2]) || 3030;
+if (require.main === module) app.listen(port, () => console.log(`Listening on port ${port}`));
 
 // Request handlers
 
