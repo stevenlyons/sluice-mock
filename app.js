@@ -9,8 +9,8 @@ const { segmentLength, shouldIgnoreRequest, checkRequestType,
         extractMimetype } = require('./lib/logic');
 
 // Caches
-var specCache = {};
-var timelineCache = {};
+let specCache = {};
+let timelineCache = {};
 
 app.use(async ctx => {
     const filepath = path.dirname(ctx.path);
@@ -64,7 +64,7 @@ app.use(async ctx => {
     }
 });
 
-if (!module.parent) app.listen(3000);
+if (require.main === module) app.listen(3000);
 
 // Request handlers
 
@@ -72,14 +72,14 @@ async function generateMediaPlaylist(ctx, filepath, filename) {
   await outputFile(ctx, '/media', filename);
 }
 
-async function generateRendition(ctx, medialength) {
+function generateRendition(ctx, medialength) {
   const start =
 `#EXTM3U
 #EXT-X-VERSION:3
 #EXT-X-TARGETDURATION:6
 #EXT-X-PLAYLIST-TYPE:VOD`;
   const end = `\n#EXT-X-ENDLIST`;
-  var segments = '';
+  let segments = '';
 
   for (let i = 0; i < medialength / segmentLength; i++) {
     segments +=
@@ -90,7 +90,7 @@ ${i}.ts`;
   outputString(ctx, 'application/x-mpegURL', start + segments + end);
 }
 
-async function generateDashMPD(ctx, mediaLength) {
+function generateDashMPD(ctx, mediaLength) {
   const mpd =
 `<?xml version="1.0" encoding="UTF-8"?>
 <MPD xmlns="urn:mpeg:dash:schema:mpd:2011"
@@ -120,12 +120,11 @@ async function processSegment(ctx, timeline, time) {
   if (segment) {
     // Delayed playback for startup or rebuffer
     if (segment.delay > 0) {
-      //await sleep(segment.delay);
       await outputFile(ctx, '/media', filename, segment.delay);
     }
 
     // Throw an Error
-    if (segment.error > 0) {
+    if (segment.error) {
       outputError(ctx, segment.error);
     }
   } else {
@@ -140,15 +139,13 @@ function outputError(ctx, code) {
   ctx.throw(code);
 }
 
-// const throttler = throttle({rate: 100, chunk: 15000});
-// await throttler(ctx, () => {;});
 async function outputFile(ctx, filepath, filename, delay = 0) {
   const fpath = path.join(__dirname, filepath, filename);
   const fstat = await stat(fpath);
 
   if (fstat.isFile()) {
     const temp = path.extname(fpath);
-    var ext = temp.charAt(0) === '.' ? extractMimetype(temp.substring(1)) : temp;
+    const ext = temp.charAt(0) === '.' ? extractMimetype(temp.substring(1)) : temp;
 
     ctx.type = ext;
     ctx.length = fstat.size;
@@ -183,6 +180,3 @@ function stat(file) {
   });
 }
 
-function sleep(seconds) {
-  return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
-}
