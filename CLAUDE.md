@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 npm install        # Install dependencies
-node app.js        # Start the server (port 3000)
-npm start          # Same as above
+node app.js        # Start the server (default port 3030)
+node app.js 8080   # Start the server on port 8080
+npm start          # Same as node app.js
 ```
 
 No test framework is currently set up.
