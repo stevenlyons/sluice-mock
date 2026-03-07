@@ -34,8 +34,8 @@ DASH: `http://localhost:3030/s5-p30-e404/media.mpd`
 The following options are available:
 * Startup Time delay: 's' + delay time (optional, defaults to 5 seconds)
 * Playback: 'p' + playback time (optional, defaults to 30 seconds)
-* Rebuffer: 'r' + delay time (optional, defaults to 30 seconds)
-  - Note: "rebuffer of X seconds" does not translate to exactly X seconds of rebuffering, it delays delivery of the segment for X seconds
+* Stall (Rebuffer): 'r' + delay time (optional, defaults to 30 seconds)
+  - Note: "stall of X seconds" does not translate to exactly X seconds of stalling, it delays delivery of the segment for X seconds
 * Error: 'e' + error code (optional, defaults to code 500)
 
 Some examples of playback specifications:
