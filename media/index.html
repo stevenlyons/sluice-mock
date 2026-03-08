@@ -1,49 +1,350 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="Content-Style-Type" content="text/css">
-  <title>Video Replay</title>
-  <style type="text/css">
-    body {background-color: #000000}
-    p {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Arial; color: #ffffff}
-    a {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Arial; color: #ffffff}
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video DVR</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=DM+Sans:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.15/dist/hls.js"></script>
-</head>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --bg:         #080808;
+      --surface:    #101010;
+      --surface2:   #161616;
+      --border:     #1e1e1e;
+      --border2:    #2a2a2a;
+      --accent:     #e05a00;
+      --accent-dim: rgba(224, 90, 0, 0.12);
+      --accent-glow:rgba(224, 90, 0, 0.35);
+      --text:       #d8d8d8;
+      --text-mid:   #888;
+      --text-dim:   #444;
+      --mono: 'Share Tech Mono', 'Courier New', monospace;
+      --sans: 'DM Sans', system-ui, sans-serif;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 28px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .wordmark {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.35em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .wordmark em {
+      color: var(--text-dim);
+      font-style: normal;
+      margin: 0 6px;
+    }
+
+    #header-spec {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.05em;
+    }
+
+    #header-spec b {
+      color: var(--accent);
+      font-weight: normal;
+    }
+
+    /* ── Main layout ── */
+    main {
+      max-width: 1060px;
+      margin: 0 auto;
+      padding: 28px 24px 48px;
+    }
+
+    /* ── Player ── */
+    .player-wrap {
+      position: relative;
+      background: #000;
+      border: 1px solid var(--border2);
+      margin-bottom: 36px;
+      overflow: hidden;
+    }
+
+    /* Subtle scanline overlay */
+    .player-wrap::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        180deg,
+        transparent 0px,
+        transparent 3px,
+        rgba(0,0,0,0.06) 3px,
+        rgba(0,0,0,0.06) 4px
+      );
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    video {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+    }
+
+    .player-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .tally {
+      flex-shrink: 0;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    .tally.on {
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent-glow);
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.45; }
+    }
+
+    #status-text {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-mid);
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Spec grid ── */
+    .specs-layout {
+      display: grid;
+      grid-template-columns: 5fr 7fr;
+      gap: 28px;
+    }
+
+    .spec-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .section-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.3em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .spec-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .spec-card {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 9px 12px 9px 14px;
+      border: 1px solid transparent;
+      border-left: 2px solid transparent;
+      background: var(--surface);
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+      user-select: none;
+    }
+
+    .spec-card:hover {
+      background: var(--surface2);
+      border-color: var(--border2);
+      border-left-color: var(--text-mid);
+    }
+
+    .spec-card.active {
+      background: var(--accent-dim);
+      border-color: rgba(224, 90, 0, 0.18);
+      border-left-color: var(--accent);
+    }
+
+    .spec-id {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text);
+      letter-spacing: 0.03em;
+    }
+
+    .spec-card.active .spec-id {
+      color: var(--accent);
+    }
+
+    .spec-desc {
+      font-size: 11px;
+      font-weight: 300;
+      color: var(--text-mid);
+      line-height: 1.4;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 28px;
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--border2);
+      text-transform: uppercase;
+    }
+  </style>
+</head>
 <body>
-<p>Examples:</p>
-<a href="index.html?spec=s5-p15">5 second Startup</a> - 
-<a href="index.html?spec=p5-r9-p30">Rebuffering mid-stream</a> - 
-<a href="index.html?spec=p15-e404">In-stream 404 error</a>
-<a href="index.html?spec=p15-r-e">End-of-stream rebuffering</a>
-<br><br>
-<video id="myVideo" controls width="960" height="540" ></video>
+
+<header>
+  <div class="wordmark">Video<em>/</em>DVR</div>
+  <div id="header-spec">NO SPEC LOADED</div>
+</header>
+
+<main>
+  <div class="player-wrap">
+    <video id="myVideo" controls></video>
+    <div class="player-bar">
+      <div class="tally" id="tally"></div>
+      <div id="status-text">READY</div>
+    </div>
+  </div>
+
+  <div class="specs-layout">
+    <div class="spec-section">
+      <div class="section-label">Inline Specs</div>
+      <div class="spec-list" id="list-inline"></div>
+    </div>
+    <div class="spec-section">
+      <div class="section-label">Named Specs</div>
+      <div class="spec-list" id="list-named"></div>
+    </div>
+  </div>
+</main>
+
+<footer>Video DVR &mdash; Player Integration Test Tool</footer>
 
 <script>
-  const searchParams = new URLSearchParams(window.location.search);
-  const spec = searchParams.get('spec') || 'p5-r9-p30';
+  const INLINE = [
+    { spec: 's5-p15',    desc: '5 second startup delay' },
+    { spec: 'p5-r9-p30', desc: 'Rebuffering mid-stream' },
+    { spec: 'p15-e404',  desc: 'In-stream 404 error' },
+    { spec: 'p15-r-e',   desc: 'End-of-stream error after rebuffer' },
+  ];
 
-  const video = document.querySelector('#myVideo');
-  const videoSrc = window.location.origin + '/' + spec + '/media.m3u8';
+  const NAMED = [
+    { spec: 'example',                desc: '5s startup delay, 30s playback, then 404 error' },
+    { spec: 'abr-example',            desc: 'Force player to low rendition, then make it unavailable' },
+    { spec: 'stall-and-recover',      desc: '10s playback, 8s stall, then 10s more playback' },
+    { spec: 'multiple-stalls',        desc: 'Multiple rebuffer events' },
+    { spec: 'network-congestion',     desc: 'Simulates a congested network at 500kbps' },
+    { spec: 'abr-rendition-fallback', desc: 'High and mid renditions unavailable — player must fall back to low' },
+    { spec: 'segment-error',          desc: '30s of playback ending in a 500 server error' },
+  ];
 
-  if (Hls.isSupported()) {
-    let hls = new Hls();
-    hls.loadSource(videoSrc);
-    hls.attachMedia(video);
+  const video      = document.getElementById('myVideo');
+  const tally      = document.getElementById('tally');
+  const statusText = document.getElementById('status-text');
+  const headerSpec = document.getElementById('header-spec');
+  let hls = null;
+
+  function buildList(specs, containerId) {
+    const container = document.getElementById(containerId);
+    specs.forEach(({ spec, desc }) => {
+      const card = document.createElement('div');
+      card.className = 'spec-card';
+      card.dataset.spec = spec;
+      card.innerHTML = `<div class="spec-id">${spec}</div><div class="spec-desc">${desc}</div>`;
+      card.addEventListener('click', () => loadSpec(spec));
+      container.appendChild(card);
+    });
   }
-  // HLS.js is not supported on platforms that do not have Media Source
-  // Extensions (MSE) enabled.
-  //
-  // When the browser has built-in HLS support (check using `canPlayType`),
-  // we can provide an HLS manifest (i.e. .m3u8 URL) directly to the video
-  // element through the `src` property. This is using the built-in support
-  // of the plain video element, without using HLS.js.
-  else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    video.src = videoSrc;
+
+  buildList(INLINE, 'list-inline');
+  buildList(NAMED,  'list-named');
+
+  function setStatus(text, live) {
+    statusText.textContent = text;
+    tally.className = 'tally' + (live ? ' on' : '');
   }
 
+  function setActive(spec) {
+    document.querySelectorAll('.spec-card').forEach(el =>
+      el.classList.toggle('active', el.dataset.spec === spec)
+    );
+    headerSpec.innerHTML = `SPEC: <b>${spec}</b>`;
+    history.replaceState(null, '', '?spec=' + encodeURIComponent(spec));
+  }
+
+  function loadSpec(spec) {
+    const url = window.location.origin + '/' + spec + '/media.m3u8';
+
+    if (hls) { hls.destroy(); hls = null; }
+    video.removeAttribute('src');
+
+    setActive(spec);
+    setStatus('LOADING', false);
+
+    if (Hls.isSupported()) {
+      hls = new Hls();
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setStatus('PLAYING ' + spec.toUpperCase(), true);
+        video.play().catch(() => {});
+      });
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data.fatal) setStatus('ERROR \u2014 ' + (data.type || 'FATAL'), false);
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
+      setStatus('PLAYING ' + spec.toUpperCase(), true);
+      video.play().catch(() => {});
+    } else {
+      setStatus('HLS NOT SUPPORTED', false);
+    }
+  }
+
+  video.addEventListener('pause',  () => setStatus('PAUSED', false));
+  video.addEventListener('play',   () => setStatus('PLAYING', true));
+  video.addEventListener('ended',  () => setStatus('ENDED', false));
+
+  const initSpec = new URLSearchParams(window.location.search).get('spec') || 'p5-r9-p30';
+  loadSpec(initSpec);
 </script>
 </body>
 </html>
