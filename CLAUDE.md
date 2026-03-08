@@ -45,10 +45,10 @@ The entire server is a single file: `app.js`. It uses **Koa** as the HTTP framew
    - Checks for `specs/<name>.json` — if found, reads and returns its `operations` array
    - Otherwise falls back to `parseSpecification(filepath)` for inline spec strings
 4. The filename determines the request type:
-   - `media.m3u8` → serve static master playlist from `media/`
-   - `rendition.m3u8` → dynamically generate an HLS rendition playlist based on total calculated duration
+   - `media.m3u8` → dynamically generate an HLS master playlist listing all renditions
+   - `rendition-<name>.m3u8` or `rendition.m3u8` → dynamically generate an HLS rendition playlist
    - `media.mpd` → dynamically generate a DASH MPD manifest based on total calculated duration
-   - `*.ts` / `*.m4s` → segment request; look up the segment number in the **timeline** and apply the action (delay or error)
+   - `*.ts` / `*.m4s` → segment request; look up the segment number in the **timeline** and apply the action (delay, bandwidth throttle, or error)
 
 ### Spec Loading
 
@@ -62,17 +62,53 @@ Two modes for specifying playback behavior:
 
 **Named spec files** — JSON files in `specs/` directory, referenced by name in the URL:
 ```json
-{ "description": "...", "operations": [ { "op": "startup", "delay": 5 }, ... ] }
+{
+  "description": "...",
+  "renditions": [
+    { "name": "low",  "bandwidth": 400000,  "resolution": "640x360" },
+    { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" }
+  ],
+  "operations": [
+    { "op": "bandwidth", "kbps": 300 },
+    { "op": "startup",   "delay": 5 },
+    { "op": "playback",  "time": 30 },
+    { "op": "error",     "code": 404, "rendition": "low" }
+  ]
+}
 ```
-The `operations` array uses the same format as inline parsing output.
+
+- `renditions` is optional — omit for single-rendition behavior
+- `name` is optional per rendition — unnamed renditions use index-based URLs (`rendition-0.m3u8`)
+- `bandwidth` and `resolution` are required per rendition; `codecs` defaults to `"mp4a.40.2,avc1.640020"`
+- `error` with `rendition` field → HTTP error when that rendition's playlist is requested (makes that quality level unavailable)
+- `error` without `rendition` → segment error at that timeline position (existing behavior)
+- `bandwidth` op → sets global sustained throughput throttle from that point forward; the player's ABR algorithm decides which rendition to use
+
+### Spec Object Shape
+
+`loadSpecification()` returns:
+```js
+{
+  operations,      // global ops (no rendition field) — used for segment timeline and media length
+  renditions,      // array of { name?, bandwidth, resolution, codecs? }
+  renditionErrors  // { 'low': 404 } — from error ops with rendition field
+}
+```
 
 ### Segment Timeline
 
-`createSegmentTimeline(operations)` maps operations to specific segment numbers. Only segments with special behavior (delay or error) appear in the timeline array — everything else is nominal playback. The timeline is cached in `timelineCache`.
+`createSegmentTimeline(operations)` maps operations to specific segment numbers. Only segments with special behavior (delay, bandwidth throttle, or error) appear in the timeline array — everything else is nominal playback. The timeline is cached in `timelineCache`.
 
-### Delay Mechanism
+Supported timeline entry types:
+- `{ segment: N, delay: X }` — startup or rebuffer delay
+- `{ segment: N, error: code }` — HTTP error on that segment
+- `{ segment: N, bandwidthKbps: X }` — sustained bandwidth throttle from that segment forward
 
-Delays are implemented by **throttling the byte delivery rate** via `koa-throttle2` (not via `sleep`). The chunk size is calculated so the single physical file (`media/0.ts`) takes the desired number of seconds to transfer.
+### Throttle Mechanism
+
+Two throttle modes via `koa-throttle2` (not `sleep`):
+- **Delay** — chunk size calculated so the file takes the desired number of seconds to transfer
+- **Bandwidth** — chunk size calculated as `kbps * 1000 / 8 / 10` bytes per 100ms interval
 
 ### Key Constants
 

@@ -17,7 +17,9 @@ The current server simulates one rendition. Real ABR players choose from multipl
 ## Design Decisions
 
 - Multi-rendition via **JSON spec files only** — inline strings stay single-rendition
-- Renditions without `operations` **inherit top-level operations**
+- Renditions are **named** — URLs use the name (`rendition-low.m3u8`), not an index
+- Bandwidth is a **global network property** — set via a top-level `bandwidth` op; the player's ABR algorithm chooses the rendition naturally based on measured throughput
+- **Rendition errors** are the only rendition-targeted operations — they make a specific quality level unavailable by returning an HTTP error when its playlist is requested
 - Both **HLS and DASH** supported
 
 ---
@@ -26,30 +28,39 @@ The current server simulates one rendition. Real ABR players choose from multipl
 
 ```json
 {
-  "description": "ABR test: 3 renditions, error on lowest",
+  "description": "Force player to low rendition, then make it unavailable",
   "renditions": [
-    { "bandwidth": 400000,  "resolution": "640x360",   "operations": [{ "op": "error", "code": 404 }] },
-    { "bandwidth": 2493700, "resolution": "1280x720" },
-    { "bandwidth": 5000000, "resolution": "1920x1080" }
+    { "name": "low",  "bandwidth": 400000,  "resolution": "640x360" },
+    { "name": "mid",  "bandwidth": 2493700, "resolution": "1280x720" },
+    { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" }
   ],
   "operations": [
-    { "op": "startup", "delay": 5 },
-    { "op": "playback", "time": 30 }
+    { "op": "bandwidth", "kbps": 300 },
+    { "op": "startup",   "delay": 5 },
+    { "op": "playback",  "time": 30 },
+    { "op": "error",     "code": 404, "rendition": "low" }
   ]
 }
 ```
 
 - `renditions` array is optional — omitting it preserves single-rendition behavior
-- Rendition without `operations` inherits top-level `operations`
-- `bandwidth` and `resolution` are required per rendition; `codecs` is optional (defaults to `"mp4a.40.2,avc1.640020"`)
+- `name` is optional per rendition — unnamed renditions fall back to index-based URLs (`rendition-0.m3u8`)
+- `bandwidth` and `resolution` are required per rendition; `codecs` defaults to `"mp4a.40.2,avc1.640020"`
+- `bandwidth` op — global, sets sustained throughput throttle from that point forward
+- `error` with `rendition` field — HTTP error when that rendition's playlist is requested (entire session)
+- `error` without `rendition` field — segment error at that timeline position (existing behavior)
 
 ---
 
 ## Behavior Model
 
-**Per-rendition operations** control the **rendition playlist response** — errors apply when the player requests that rendition's playlist (e.g., `rendition-0.m3u8`).
+**Global operations** drive segment delivery — startup, playback, rebuffer, error (without rendition), and bandwidth ops all apply to the shared segment timeline.
 
-**Segment delivery** uses the **top-level operations** shared across all renditions. All renditions serve segments from the same URL namespace using one shared timeline.
+**Rendition errors** make a specific quality level unavailable. When the player requests `rendition-low.m3u8`, the server returns the specified HTTP error code. The player's ABR logic falls back to another rendition.
+
+**Bandwidth throttle** is global — all segment delivery is throttled to the specified kbps. The player measures throughput and its ABR algorithm selects the appropriate rendition. Delay ops take precedence over bandwidth throttle when both apply.
+
+All renditions share the same segment URL namespace (`0.ts`, `1.ts`, etc.) — there are no per-rendition segment paths.
 
 ---
 
@@ -65,20 +76,47 @@ The current server simulates one rendition. Real ABR players choose from multipl
 #EXT-X-INDEPENDENT-SEGMENTS
 
 #EXT-X-STREAM-INF:BANDWIDTH=400000,RESOLUTION=640x360,CODECS="mp4a.40.2,avc1.640020"
-rendition-0.m3u8
+rendition-low.m3u8
 #EXT-X-STREAM-INF:BANDWIDTH=2493700,RESOLUTION=1280x720,CODECS="mp4a.40.2,avc1.640020"
-rendition-1.m3u8
+rendition-mid.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080,CODECS="mp4a.40.2,avc1.640020"
+rendition-high.m3u8
 ```
 
 ### HLS Rendition Playlists
 
-`/spec/rendition-0.m3u8`, `/spec/rendition-1.m3u8`, etc. — each generated from that rendition's resolved operations.
+`/spec/rendition-low.m3u8`, `/spec/rendition-mid.m3u8`, etc. — each returns a VOD playlist with shared segment numbers. Returns an HTTP error if that rendition has a matching `renditionErrors` entry.
 
-`rendition.m3u8` remains valid as an alias for `rendition-0.m3u8` (backward compatibility for single-rendition inline specs).
+`rendition.m3u8` remains valid for single-rendition inline specs (backward compatibility).
 
 ### DASH Manifest
 
-`/spec/media.mpd` — dynamically generated with one `Representation` per rendition in a single `AdaptationSet`.
+`/spec/media.mpd` — dynamically generated with one `Representation` per rendition in a single `AdaptationSet`. Representation IDs use the rendition name when available.
+
+---
+
+## Spec Object Shape
+
+`loadSpecification()` returns:
+
+```js
+{
+  operations,      // global ops only (rendition-targeted ops excluded) — used for timeline and media length
+  renditions,      // array of { name?, bandwidth, resolution, codecs? }
+  renditionErrors  // { 'low': 404, ... } — built from error ops with rendition field
+}
+```
+
+---
+
+## Segment Timeline Extensions
+
+`createSegmentTimeline()` handles two new cases:
+
+- Ops with a `rendition` field are **skipped** — they are handled via `renditionErrors`, not the timeline
+- `bandwidth` op pushes `{ segment: currentSegment, bandwidthKbps: kbps }` — does not advance `currentSegment`
+
+`processSegment()` finds the active bandwidth by scanning the timeline in reverse for the last `bandwidthKbps` entry at or before the current segment number, then passes it to `outputFile()`.
 
 ---
 
@@ -86,25 +124,27 @@ rendition-1.m3u8
 
 ### `lib/logic.js`
 
-- `checkRequestType()` — extended to recognize `rendition-N.m3u8` pattern
-- `extractRenditionIndex(filename)` — `'rendition-2.m3u8'` → `2`, `'rendition.m3u8'` → `0`
-- `resolveRenditions(spec)` — normalizes renditions array with inherited operations
+- `checkRequestType()` — updated regex to `rendition-\w+` (word chars, not just digits)
+- `extractRenditionName(filename)` — `'rendition-low.m3u8'` → `'low'`, `'rendition.m3u8'` → `null`
+- `resolveRenditions(spec)` — normalizes renditions array; no per-rendition operations merging
+- `resolveRenditionErrors(operations)` — scans ops for `error` entries with `rendition` field; returns `{ name: code }` map
+- `createSegmentTimeline()` — skips rendition-targeted ops; handles `bandwidth` op
 
 ### `app.js`
 
-- `loadSpecification()` — returns `{ operations, renditions }` instead of bare operations array
-- `specCache` — stores the full spec object
-- `generateMediaPlaylist()` — dynamically generates master playlist from `spec.renditions`
-- `rendition` case — uses `extractRenditionIndex(filename)` to look up per-rendition operations; errors on that rendition return HTTP error
-- `generateDashMPD()` — generates `<Representation>` for each rendition
-- `timelineCache` — uses top-level operations (shared across renditions)
+- `loadSpecification()` — returns `{ operations, renditions, renditionErrors }`; global ops filter excludes rendition-targeted errors
+- `generateMediaPlaylist()` — uses `rendition-${r.name}.m3u8` for named renditions, `rendition-${i}.m3u8` fallback
+- Rendition case — `extractRenditionName(filename)` lookup in `spec.renditionErrors`; returns HTTP error if found
+- `processSegment()` — reverse-scans timeline for active `bandwidthKbps`; passes to `outputFile()`
+- `outputFile()` — added `bandwidthKbps` param; throttles at `kbps * 1000 / 8 / 10` bytes per 100ms when no delay active
+- `generateDashMPD()` — uses `r.name` for representation ID when available
 
 ---
 
 ## Relevant Files
 
-- `lib/logic.js` — `extractRenditionIndex`, `resolveRenditions`, updated `checkRequestType`
-- `app.js` — Dynamic master playlist, per-rendition routing, updated spec/cache shape
-- `specs/abr-example.json` — Example multi-rendition spec
-- `lib/logic.test.js` — Tests for new logic functions
-- `app.test.js` — Tests for multi-rendition spec loading
+- `lib/logic.js` — `extractRenditionName`, `resolveRenditions`, `resolveRenditionErrors`, updated `checkRequestType` and `createSegmentTimeline`
+- `app.js` — Named rendition routing, rendition error lookup, bandwidth throttle in segment processing
+- `specs/abr-example.json` — Example multi-rendition spec with named renditions and bandwidth op
+- `lib/logic.test.js` — Tests for all new logic functions
+- `app.test.js` — Tests for multi-rendition spec loading and rendition error resolution
