@@ -1,0 +1,13 @@
+{
+  "description": "Simulates a congested network at 500kbps — player should select a low rendition",
+  "renditions": [
+    { "name": "low",  "bandwidth": 400000,  "resolution": "640x360" },
+    { "name": "mid",  "bandwidth": 2493700, "resolution": "1280x720" },
+    { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" }
+  ],
+  "operations": [
+    { "op": "bandwidth", "kbps": 500 },
+    { "op": "startup",   "delay": 3 },
+    { "op": "playback",  "time": 60 }
+  ]
+}

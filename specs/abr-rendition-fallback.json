@@ -1,0 +1,14 @@
+{
+  "description": "High and mid renditions unavailable — player must fall back to low",
+  "renditions": [
+    { "name": "low",  "bandwidth": 400000,  "resolution": "640x360" },
+    { "name": "mid",  "bandwidth": 2493700, "resolution": "1280x720" },
+    { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" }
+  ],
+  "operations": [
+    { "op": "startup",  "delay": 2 },
+    { "op": "playback", "time": 30 },
+    { "op": "error",    "code": 404, "rendition": "high", "on": "segment" },
+    { "op": "error",    "code": 404, "rendition": "mid", "on": "segment" }
+  ]
+}

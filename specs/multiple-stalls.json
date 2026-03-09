@@ -1,0 +1,13 @@
+{
+  "description": "Multiple rebuffer events — tests player stall counting and recovery metrics",
+  "operations": [
+    { "op": "startup", "delay": 2 },
+    { "op": "playback", "time": 10 },
+    { "op": "rebuffer", "delay": 5 },
+    { "op": "playback", "time": 10 },
+    { "op": "rebuffer", "delay": 5 },
+    { "op": "playback", "time": 10 },
+    { "op": "rebuffer", "delay": 5 },
+    { "op": "playback", "time": 10 }
+  ]
+}

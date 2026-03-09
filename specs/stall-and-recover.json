@@ -1,0 +1,9 @@
+{
+  "description": "10s playback, 8s stall, then 10s more playback — tests rebuffer recovery",
+  "operations": [
+    { "op": "startup", "delay": 2 },
+    { "op": "playback", "time": 10 },
+    { "op": "rebuffer", "delay": 8 },
+    { "op": "playback", "time": 10 }
+  ]
+}

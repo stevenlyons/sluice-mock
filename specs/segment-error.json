@@ -1,0 +1,8 @@
+{
+  "description": "30s of playback ending in a 500 server error — tests player error handling",
+  "operations": [
+    { "op": "startup",  "delay": 2 },
+    { "op": "playback", "time": 30 },
+    { "op": "error",    "code": 500 }
+  ]
+}
