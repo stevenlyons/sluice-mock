@@ -4,7 +4,8 @@ const app = module.exports = new Koa();
 const path = require('path');
 const throttle = require('koa-throttle2');
 const { segmentLength, shouldIgnoreRequest, checkRequestType,
-        parseSpecification, createSegmentTimeline,
+        extractRenditionName, resolveRenditions, resolveRenditionErrors,
+        extractRenditionFromSegment, parseSpecification, createSegmentTimeline,
         calculateElapsedPlayheadTime, calculateMediaLength,
         extractMimetype } = require('./lib/logic');
 
@@ -25,39 +26,49 @@ app.use(async ctx => {
         console.log('loadSpecification: ' + filepath);
         console.dir(specCache[filepath]);
     }
-    const operations = specCache[filepath];
+    const spec = specCache[filepath];
 
     switch (checkRequestType(filename)) {
       case 'media':
         console.log('Media request');
-
-        await generateMediaPlaylist(ctx, filepath, filename);
+        await generateMediaPlaylist(ctx, spec);
         break;
-      case 'rendition':
+      case 'rendition': {
         console.log('Rendition request');
-
-        const mediaLength = calculateMediaLength(operations);
-        await generateRendition(ctx, mediaLength);
+        const renditionName = extractRenditionName(filename);
+        const renditionError = renditionName && spec.renditionErrors.playlist[renditionName];
+        if (renditionError) {
+          outputError(ctx, renditionError);
+        } else {
+          const mediaLength = calculateMediaLength(spec.operations);
+          const hasSegmentError = renditionName && !!spec.renditionErrors.segment[renditionName];
+          await generateRendition(ctx, mediaLength, renditionName, hasSegmentError);
+        }
         break;
-      case 'dash-manifest':
+      }
+      case 'dash-manifest': {
         console.log('DASH manifest request');
-
-        const dashLength = calculateMediaLength(operations);
-        await generateDashMPD(ctx, dashLength);
+        const dashLength = calculateMediaLength(spec.operations);
+        await generateDashMPD(ctx, dashLength, spec.renditions);
         break;
-      case 'segment':
+      }
+      case 'segment': {
         console.log('Segment request');
-
+        const { rendition: segRendition } = extractRenditionFromSegment(filename);
+        if (segRendition && spec.renditionErrors.segment[segRendition]) {
+          outputError(ctx, spec.renditionErrors.segment[segRendition]);
+          break;
+        }
         if (!timelineCache[filepath]) {
-            timelineCache[filepath] = createSegmentTimeline(operations);
+            timelineCache[filepath] = createSegmentTimeline(spec.operations);
             console.log('createSegmentTimeline:');
             console.dir(timelineCache[filepath]);
         }
         const timeline = timelineCache[filepath];
         const time = calculateElapsedPlayheadTime(filename);
-
         await processSegment(ctx, timeline, time, filename);
         break;
+      }
       default:
         await outputFile(ctx, '/media', filename);
         break;
@@ -74,19 +85,32 @@ async function loadSpecification(filepath) {
   const specFile = path.join(__dirname, 'specs', `${name}.json`);
   try {
     const contents = await fs.promises.readFile(specFile, 'utf8');
-    return JSON.parse(contents).operations;
+    const json = JSON.parse(contents);
+    const operations = (json.operations || []).filter(op => !op.rendition);
+    const renditionErrors = resolveRenditionErrors(json.operations);
+    return { operations, renditions: resolveRenditions(json), renditionErrors };
   } catch {
-    return parseSpecification(filepath);
+    const operations = parseSpecification(filepath);
+    return { operations, renditions: resolveRenditions({ operations }), renditionErrors: { playlist: {}, segment: {} } };
   }
 }
 
 // Request handlers
 
-async function generateMediaPlaylist(ctx, filepath, filename) {
-  await outputFile(ctx, '/media', filename);
+function generateMediaPlaylist(ctx, spec) {
+  const defaultCodecs = 'mp4a.40.2,avc1.640020';
+  let playlist = '#EXTM3U\n#EXT-X-VERSION:5\n#EXT-X-INDEPENDENT-SEGMENTS';
+
+  spec.renditions.forEach((r, i) => {
+    const codecs = r.codecs || defaultCodecs;
+    const renditionFile = r.name ? `rendition-${r.name}.m3u8` : `rendition-${i}.m3u8`;
+    playlist += `\n\n#EXT-X-STREAM-INF:BANDWIDTH=${r.bandwidth},RESOLUTION=${r.resolution},CODECS="${codecs}"\n${renditionFile}`;
+  });
+
+  outputString(ctx, 'application/x-mpegURL', playlist);
 }
 
-function generateRendition(ctx, medialength) {
+function generateRendition(ctx, medialength, renditionName, hasSegmentError) {
   const start =
 `#EXTM3U
 #EXT-X-VERSION:3
@@ -96,15 +120,24 @@ function generateRendition(ctx, medialength) {
   let segments = '';
 
   for (let i = 0; i < medialength / segmentLength; i++) {
+    const segFile = hasSegmentError ? `rendition-${renditionName}-${i}.ts` : `${i}.ts`;
     segments +=
 `\n#EXTINF:5,
-${i}.ts`;
+${segFile}`;
   }
 
   outputString(ctx, 'application/x-mpegURL', start + segments + end);
 }
 
-function generateDashMPD(ctx, mediaLength) {
+function generateDashMPD(ctx, mediaLength, renditions) {
+  const representations = renditions.map((r, i) => {
+    const [width, height] = r.resolution.split('x');
+    const id = r.name || (i + 1);
+    return `      <Representation id="${id}" bandwidth="${r.bandwidth}" codecs="avc1.640020" width="${width}" height="${height}">
+        <SegmentTemplate media="$Number$.m4s" duration="5" timescale="1" startNumber="0"/>
+      </Representation>`;
+  }).join('\n');
+
   const mpd =
 `<?xml version="1.0" encoding="UTF-8"?>
 <MPD xmlns="urn:mpeg:dash:schema:mpd:2011"
@@ -113,9 +146,7 @@ function generateDashMPD(ctx, mediaLength) {
      minBufferTime="PT2S">
   <Period>
     <AdaptationSet mimeType="video/mp4" segmentAlignment="true">
-      <Representation id="1" bandwidth="2493700" codecs="avc1.640020" width="1280" height="720">
-        <SegmentTemplate media="$Number$.m4s" duration="5" timescale="1" startNumber="0"/>
-      </Representation>
+${representations}
     </AdaptationSet>
   </Period>
 </MPD>`;
@@ -132,20 +163,27 @@ async function processSegment(ctx, timeline, time, requestedFilename) {
   const ext = path.extname(requestedFilename);
   const filename = `0${ext}`;
 
-  if (segment) {
-    // Delayed playback for startup or rebuffer
-    if (segment.delay > 0) {
-      await outputFile(ctx, '/media', filename, segment.delay);
-    }
+  // Find the active bandwidth throttle (last bandwidth entry at or before this segment)
+  const bandwidthEntry = [...timeline].reverse()
+    .find(el => el.bandwidthKbps !== undefined && el.segment <= segmentNum);
+  const bandwidthKbps = bandwidthEntry?.bandwidthKbps;
 
+  if (segment) {
     // Throw an Error
     if (segment.error) {
       outputError(ctx, segment.error);
+      return;
     }
-  } else {
-    // Nominal playback
-    await outputFile(ctx, '/media', filename);
+
+    // Delayed playback for startup or rebuffer (delay takes precedence over bandwidth)
+    if (segment.delay > 0) {
+      await outputFile(ctx, '/media', filename, segment.delay);
+      return;
+    }
   }
+
+  // Nominal playback with optional bandwidth throttle
+  await outputFile(ctx, '/media', filename, 0, bandwidthKbps);
 };
 
 // Output
@@ -154,7 +192,7 @@ function outputError(ctx, code) {
   ctx.throw(code);
 }
 
-async function outputFile(ctx, filepath, filename, delay = 0) {
+async function outputFile(ctx, filepath, filename, delay = 0, bandwidthKbps = 0) {
   const fpath = path.join(__dirname, filepath, filename);
   const fstat = await stat(fpath);
 
@@ -170,7 +208,11 @@ async function outputFile(ctx, filepath, filename, delay = 0) {
       // Calculate the number of bits per 100ms interval to throttle the file to the specified time
       const chunk = (fstat.size / 10) / delay;
       const throttler = throttle({rate: 100, chunk: chunk});
-      // Throttle the response, pass a no-op function for the expected `next()`
+      await throttler(ctx, () => {;});
+    } else if (bandwidthKbps > 0) {
+      // Throttle to the specified kbps: bytes per 100ms interval
+      const chunk = (bandwidthKbps * 1000 / 8) / 10;
+      const throttler = throttle({rate: 100, chunk: chunk});
       await throttler(ctx, () => {;});
     }
   }
