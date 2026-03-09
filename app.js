@@ -75,7 +75,8 @@ app.use(async ctx => {
     }
 });
 
-const port = parseInt(process.argv[2]) || 3030;
+const portFlagIndex = process.argv.findIndex(a => a === '--port' || a === '-p');
+const port = portFlagIndex !== -1 ? parseInt(process.argv[portFlagIndex + 1]) : 3030;
 if (require.main === module) app.listen(port, () => console.log(`Listening on port ${port}`));
 
 module.exports.loadSpecification = loadSpecification;

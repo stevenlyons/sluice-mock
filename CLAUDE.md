@@ -10,8 +10,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 npm install        # Install dependencies
-node app.js        # Start the server (default port 3030)
-node app.js 8080   # Start the server on port 8080
+node app.js                  # Start the server (default port 3030)
+node app.js --port 8080      # Start the server on port 8080
+node app.js -p 8080          # Same as --port
 npm start          # Same as node app.js
 ```
 
