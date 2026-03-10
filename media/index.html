@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=DM+Sans:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.15/dist/hls.js"></script>
+  <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -216,6 +217,71 @@
       line-height: 1.4;
     }
 
+    /* ── Protocol toggle ── */
+    .protocol-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .proto-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      color: var(--text-dim);
+      transition: color 0.15s;
+    }
+
+    .proto-label.active {
+      color: var(--accent);
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 34px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 9px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .toggle-switch input:checked + .toggle-track {
+      background: var(--accent-dim);
+      border-color: rgba(224, 90, 0, 0.35);
+    }
+
+    .toggle-switch input:checked + .toggle-track::after {
+      transform: translateX(16px);
+      background: var(--accent);
+    }
+
     /* ── Footer ── */
     footer {
       text-align: center;
@@ -232,6 +298,14 @@
 
 <header>
   <div class="wordmark">Sluice<em>/</em>Video Mock</div>
+  <div class="protocol-toggle">
+    <span class="proto-label active" id="label-hls">HLS</span>
+    <label class="toggle-switch" title="Switch between HLS and DASH">
+      <input type="checkbox" id="protocol-switch">
+      <span class="toggle-track"></span>
+    </label>
+    <span class="proto-label" id="label-dash">DASH</span>
+  </div>
   <div id="header-spec">NO SPEC LOADED</div>
 </header>
 
@@ -276,11 +350,25 @@
     { spec: 'segment-error',          desc: '30s of playback ending in a 500 server error' },
   ];
 
-  const video      = document.getElementById('myVideo');
-  const tally      = document.getElementById('tally');
-  const statusText = document.getElementById('status-text');
-  const headerSpec = document.getElementById('header-spec');
-  let hls = null;
+  const video          = document.getElementById('myVideo');
+  const tally          = document.getElementById('tally');
+  const statusText     = document.getElementById('status-text');
+  const headerSpec     = document.getElementById('header-spec');
+  const protocolSwitch = document.getElementById('protocol-switch');
+  const labelHls       = document.getElementById('label-hls');
+  const labelDash      = document.getElementById('label-dash');
+  let hls  = null;
+  let dash = null;
+
+  const params = new URLSearchParams(window.location.search);
+  let currentProtocol = params.get('protocol') === 'dash' ? 'dash' : 'hls';
+  let currentSpec     = params.get('spec') || 'p5-r9-p30';
+
+  if (currentProtocol === 'dash') {
+    protocolSwitch.checked = true;
+    labelHls.classList.remove('active');
+    labelDash.classList.add('active');
+  }
 
   function buildList(specs, containerId) {
     const container = document.getElementById(containerId);
@@ -306,45 +394,68 @@
     document.querySelectorAll('.spec-card').forEach(el =>
       el.classList.toggle('active', el.dataset.spec === spec)
     );
-    headerSpec.innerHTML = `SPEC: <b>${spec}</b>`;
-    history.replaceState(null, '', '?spec=' + encodeURIComponent(spec));
+    headerSpec.innerHTML = `SPEC: <b>${spec}</b> <span style="color:var(--text-dim);font-weight:normal">${currentProtocol.toUpperCase()}</span>`;
+    history.replaceState(null, '', '?spec=' + encodeURIComponent(spec) + '&protocol=' + currentProtocol);
+  }
+
+  function destroyPlayers() {
+    if (hls)  { hls.destroy();  hls  = null; }
+    if (dash) { dash.destroy(); dash = null; }
+    video.removeAttribute('src');
   }
 
   function loadSpec(spec) {
-    const url = window.location.origin + '/' + spec + '/media.m3u8';
-
-    if (hls) { hls.destroy(); hls = null; }
-    video.removeAttribute('src');
-
+    currentSpec = spec;
+    destroyPlayers();
     setActive(spec);
     setStatus('LOADING', false);
 
-    if (Hls.isSupported()) {
-      hls = new Hls();
-      hls.loadSource(url);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+    if (currentProtocol === 'dash') {
+      const url = window.location.origin + '/' + spec + '/media.mpd';
+      dash = dashjs.MediaPlayer().create();
+      dash.initialize(video, url, false);
+      dash.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, () => {
         setStatus('PLAYING ' + spec.toUpperCase(), true);
         video.play().catch(() => {});
       });
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal) setStatus('ERROR \u2014 ' + (data.type || 'FATAL'), false);
+      dash.on(dashjs.MediaPlayer.events.ERROR, (e) => {
+        setStatus('ERROR \u2014 ' + (e.error?.code || 'FATAL'), false);
       });
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = url;
-      setStatus('PLAYING ' + spec.toUpperCase(), true);
-      video.play().catch(() => {});
     } else {
-      setStatus('HLS NOT SUPPORTED', false);
+      const url = window.location.origin + '/' + spec + '/media.m3u8';
+      if (Hls.isSupported()) {
+        hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          setStatus('PLAYING ' + spec.toUpperCase(), true);
+          video.play().catch(() => {});
+        });
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (data.fatal) setStatus('ERROR \u2014 ' + (data.type || 'FATAL'), false);
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = url;
+        setStatus('PLAYING ' + spec.toUpperCase(), true);
+        video.play().catch(() => {});
+      } else {
+        setStatus('HLS NOT SUPPORTED', false);
+      }
     }
   }
+
+  protocolSwitch.addEventListener('change', () => {
+    currentProtocol = protocolSwitch.checked ? 'dash' : 'hls';
+    labelHls.classList.toggle('active', !protocolSwitch.checked);
+    labelDash.classList.toggle('active', protocolSwitch.checked);
+    loadSpec(currentSpec);
+  });
 
   video.addEventListener('pause',  () => setStatus('PAUSED', false));
   video.addEventListener('play',   () => setStatus('PLAYING', true));
   video.addEventListener('ended',  () => setStatus('ENDED', false));
 
-  const initSpec = new URLSearchParams(window.location.search).get('spec') || 'p5-r9-p30';
-  loadSpec(initSpec);
+  loadSpec(currentSpec);
 </script>
 </body>
 </html>
