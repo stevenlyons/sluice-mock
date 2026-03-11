@@ -1,5 +1,6 @@
 const Koa = require('koa');
 const fs = require('fs');
+const { Readable } = require('stream');
 const app = module.exports = new Koa();
 const path = require('path');
 const throttle = require('koa-throttle2');
@@ -7,7 +8,7 @@ const { segmentLength, shouldIgnoreRequest, checkRequestType,
         extractRenditionName, resolveRenditions, resolveRenditionErrors,
         extractRenditionFromSegment, parseSpecification, createSegmentTimeline,
         calculateElapsedPlayheadTime, calculateMediaLength,
-        extractMimetype } = require('./lib/logic');
+        extractMimetype, findBox } = require('./lib/logic');
 
 // Caches
 let specCache = {};
@@ -100,7 +101,7 @@ async function loadSpecification(filepath) {
 
 function generateMediaPlaylist(ctx, spec) {
   const defaultCodecs = 'mp4a.40.2,avc1.640020';
-  let playlist = '#EXTM3U\n#EXT-X-VERSION:5\n#EXT-X-INDEPENDENT-SEGMENTS';
+  let playlist = '#EXTM3U\n#EXT-X-VERSION:7';
 
   spec.renditions.forEach((r, i) => {
     const codecs = r.codecs || defaultCodecs;
@@ -114,16 +115,19 @@ function generateMediaPlaylist(ctx, spec) {
 function generateRendition(ctx, medialength, renditionName, hasSegmentError) {
   const start =
 `#EXTM3U
-#EXT-X-VERSION:3
+#EXT-X-VERSION:7
 #EXT-X-TARGETDURATION:6
-#EXT-X-PLAYLIST-TYPE:VOD`;
+#EXT-X-PLAYLIST-TYPE:VOD
+#EXT-X-INDEPENDENT-SEGMENTS
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-MAP:URI="init.mp4"`;
   const end = `\n#EXT-X-ENDLIST`;
   let segments = '';
 
   for (let i = 0; i < medialength / segmentLength; i++) {
-    const segFile = hasSegmentError ? `rendition-${renditionName}-${i}.ts` : `${i}.ts`;
+    const segFile = hasSegmentError ? `rendition-${renditionName}-seg-${i+1}.m4s` : `seg-${i+1}.m4s`;
     segments +=
-`\n#EXTINF:5,
+`\n#EXTINF:6.006,
 ${segFile}`;
   }
 
@@ -139,13 +143,10 @@ function generateDashMPD(ctx, mediaLength, renditions) {
 
   const mpd =
 `<?xml version="1.0" encoding="UTF-8"?>
-<MPD xmlns="urn:mpeg:dash:schema:mpd:2011"
-     type="static"
-     mediaPresentationDuration="PT${mediaLength}S"
-     minBufferTime="PT2S">
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="PT${mediaLength}S" minBufferTime="PT2S">
   <Period>
     <AdaptationSet mimeType="video/mp4" segmentAlignment="true">
-      <SegmentTemplate initialization="init.mp4" media="$Number$.m4s" duration="6" timescale="1" startNumber="0"/>
+      <SegmentTemplate initialization="init.mp4" media="seg-$Number$.m4s" duration="6006" timescale="1000" startNumber="1"/>
 ${representations}
     </AdaptationSet>
   </Period>
@@ -161,7 +162,13 @@ async function processSegment(ctx, timeline, time, requestedFilename) {
   const segment = timeline.find((el) => el.segment === segmentNum);
 
   const ext = path.extname(requestedFilename);
-  const filename = `0${ext}`;
+  const baseName = path.basename(requestedFilename, ext);
+  const segMatch = baseName.match(/^seg-(\d+)$/);
+  const requestedSegNum = segMatch ? parseInt(segMatch[1]) : NaN;
+  const NUM_SEGMENTS = 5;
+  const filename = isNaN(requestedSegNum)
+    ? `seg-1${ext}`
+    : `seg-${((requestedSegNum - 1) % NUM_SEGMENTS) + 1}${ext}`;
 
   // Find the active bandwidth throttle (last bandwidth entry at or before this segment)
   const bandwidthEntry = [...timeline].reverse()
@@ -177,13 +184,13 @@ async function processSegment(ctx, timeline, time, requestedFilename) {
 
     // Delayed playback for startup or rebuffer (delay takes precedence over bandwidth)
     if (segment.delay > 0) {
-      await outputFile(ctx, '/media', filename, segment.delay);
+      await outputFile(ctx, '/media', filename, segment.delay, 0, requestedSegNum);
       return;
     }
   }
 
   // Nominal playback with optional bandwidth throttle
-  await outputFile(ctx, '/media', filename, 0, bandwidthKbps);
+  await outputFile(ctx, '/media', filename, 0, bandwidthKbps, requestedSegNum);
 };
 
 // Output
@@ -192,7 +199,7 @@ function outputError(ctx, code) {
   ctx.throw(code);
 }
 
-async function outputFile(ctx, filepath, filename, delay = 0, bandwidthKbps = 0) {
+async function outputFile(ctx, filepath, filename, delay = 0, bandwidthKbps = 0, sequenceNumber = null) {
   const fpath = path.join(__dirname, filepath, filename);
   const fstat = await stat(fpath);
 
@@ -202,7 +209,24 @@ async function outputFile(ctx, filepath, filename, delay = 0, bandwidthKbps = 0)
 
     ctx.type = ext;
     ctx.length = fstat.size;
-    ctx.body = fs.createReadStream(fpath);
+
+    if (sequenceNumber !== null && !isNaN(sequenceNumber) && path.extname(filename) === '.m4s') {
+      const buf = await fs.promises.readFile(fpath);
+      // Patch the mfhd sequence_number at byte offset 20:
+      // moof header (8) + mfhd header (8) + version/flags (4) = 20
+      buf.writeUInt32BE(sequenceNumber, 20);
+      // Patch the tfdt baseMediaDecodeTime so each segment starts at the right point
+      // in the timeline regardless of which physical file is being served.
+      // 24000 (timescale) * 6.006s (segment duration) = 144144 ticks per segment
+      const tfdtOffset = findBox(buf, 'tfdt');
+      if (tfdtOffset !== -1) {
+        const decodeTime = BigInt(144144) * BigInt(sequenceNumber - 1);
+        buf.writeBigUInt64BE(decodeTime, tfdtOffset + 12); // version=1, 64-bit field
+      }
+      ctx.body = Readable.from(buf);
+    } else {
+      ctx.body = fs.createReadStream(fpath);
+    }
 
     if (delay > 0) {
       // Calculate the number of bits per 100ms interval to throttle the file to the specified time
