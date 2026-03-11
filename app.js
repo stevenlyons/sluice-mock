@@ -134,9 +134,7 @@ function generateDashMPD(ctx, mediaLength, renditions) {
   const representations = renditions.map((r, i) => {
     const [width, height] = r.resolution.split('x');
     const id = r.name || (i + 1);
-    return `      <Representation id="${id}" bandwidth="${r.bandwidth}" codecs="avc1.640020" width="${width}" height="${height}">
-        <SegmentTemplate media="$Number$.m4s" duration="5" timescale="1" startNumber="0"/>
-      </Representation>`;
+    return `      <Representation id="${id}" bandwidth="${r.bandwidth}" codecs="avc1.640020" width="${width}" height="${height}"/>`;
   }).join('\n');
 
   const mpd =
@@ -147,6 +145,7 @@ function generateDashMPD(ctx, mediaLength, renditions) {
      minBufferTime="PT2S">
   <Period>
     <AdaptationSet mimeType="video/mp4" segmentAlignment="true">
+      <SegmentTemplate initialization="init.mp4" media="$Number$.m4s" duration="6" timescale="1" startNumber="0"/>
 ${representations}
     </AdaptationSet>
   </Period>
