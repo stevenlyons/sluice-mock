@@ -33,7 +33,7 @@ DASH: `http://localhost:3030/s5-p30-e404/media.mpd`
 
 The following options are available:
 * Startup Time delay: `s` + delay time (optional, defaults to 5 seconds)
-* Playback: `p` + playback time (optional, defaults to 30 seconds)
+* Playback: `p` + playback time (optional, defaults to 30 seconds) — rounds up to the nearest segment boundary (~6 seconds)
 * Stall (Rebuffer): `r` + delay time (optional, defaults to 30 seconds)
   - Note: "stall of X seconds" delays delivery of the segment for X seconds, not wall-clock stall time
 * Error: `e` + error code (optional, defaults to code 500)
@@ -103,6 +103,7 @@ The master playlist at `/my-scenario/media.m3u8` lists `rendition-low.m3u8`, `re
 - `bandwidth` — throttles all segment delivery to the specified kbps; the player's ABR algorithm picks the rendition based on measured throughput
 - `error` with `rendition` — returns an HTTP error when that rendition's playlist is requested, making that quality level unavailable
 - All other operations (`startup`, `playback`, `rebuffer`, `error` without `rendition`) apply globally to segment delivery
+- `playback` time rounds up to the nearest segment boundary (~6 seconds)
 
 ### Playing
 
