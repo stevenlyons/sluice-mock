@@ -72,9 +72,16 @@
 
     /* ── Main layout ── */
     main {
-      max-width: 1060px;
+      max-width: 1280px;
       margin: 0 auto;
       padding: 28px 24px 48px;
+    }
+
+    .content-layout {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+      align-items: start;
     }
 
     /* ── Player ── */
@@ -82,7 +89,6 @@
       position: relative;
       background: #000;
       border: 1px solid var(--border2);
-      margin-bottom: 36px;
       overflow: hidden;
     }
 
@@ -145,11 +151,13 @@
       letter-spacing: 0.05em;
     }
 
-    /* ── Spec grid ── */
-    .specs-layout {
-      display: grid;
-      grid-template-columns: 5fr 7fr;
-      gap: 28px;
+    /* ── Specs column ── */
+    .specs-column {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      max-height: calc(100vh - 120px);
+      overflow-y: auto;
     }
 
     .spec-section {
@@ -310,22 +318,26 @@
 </header>
 
 <main>
-  <div class="player-wrap">
-    <video id="myVideo" controls></video>
-    <div class="player-bar">
-      <div class="tally" id="tally"></div>
-      <div id="status-text">READY</div>
+  <div class="content-layout">
+    <div class="player-column">
+      <div class="player-wrap">
+        <video id="myVideo" controls></video>
+        <div class="player-bar">
+          <div class="tally" id="tally"></div>
+          <div id="status-text">READY</div>
+        </div>
+      </div>
     </div>
-  </div>
 
-  <div class="specs-layout">
-    <div class="spec-section">
-      <div class="section-label">Inline Specs</div>
-      <div class="spec-list" id="list-inline"></div>
-    </div>
-    <div class="spec-section">
-      <div class="section-label">Named Specs</div>
-      <div class="spec-list" id="list-named"></div>
+    <div class="specs-column">
+      <div class="spec-section">
+        <div class="section-label">Inline Specs</div>
+        <div class="spec-list" id="list-inline"></div>
+      </div>
+      <div class="spec-section">
+        <div class="section-label">Named Specs</div>
+        <div class="spec-list" id="list-named"></div>
+      </div>
     </div>
   </div>
 </main>
