@@ -413,14 +413,13 @@
     if (currentProtocol === 'dash') {
       const url = window.location.origin + '/' + spec + '/media.mpd';
       dash = dashjs.MediaPlayer().create();
-      dash.initialize(video, url, false);
       dash.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, () => {
         setStatus('PLAYING ' + spec.toUpperCase(), true);
-        video.play().catch(() => {});
       });
       dash.on(dashjs.MediaPlayer.events.ERROR, (e) => {
         setStatus('ERROR \u2014 ' + (e.error?.code || 'FATAL'), false);
       });
+      dash.initialize(video, url, true);
     } else {
       const url = window.location.origin + '/' + spec + '/media.m3u8';
       if (Hls.isSupported()) {
