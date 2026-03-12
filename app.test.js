@@ -117,7 +117,7 @@ describe('loadSpecification', () => {
     const spec = await loadSpecification('/example');
     assert.deepEqual(spec.operations, [
       { op: 'startup', delay: 5 },
-      { op: 'playback', time: 30 },
+      { op: 'playback', time: 12 },
       { op: 'error', code: 404 },
     ]);
   });
@@ -146,7 +146,7 @@ describe('loadSpecification', () => {
     const spec = await loadSpecification('example');
     assert.deepEqual(spec.operations, [
       { op: 'startup', delay: 5 },
-      { op: 'playback', time: 30 },
+      { op: 'playback', time: 12 },
       { op: 'error', code: 404 },
     ]);
   });

@@ -346,16 +346,16 @@
 
 <script>
   const INLINE = [
-    { spec: 's5-p15',    desc: '5 second startup delay' },
-    { spec: 'p5-r9-p30', desc: 'Rebuffering mid-stream' },
-    { spec: 'p15-e404',  desc: 'In-stream 404 error' },
-    { spec: 'p15-r-e',   desc: 'End-of-stream error after rebuffer' },
+    { spec: 's5-p18',    desc: '5 second startup delay' },
+    { spec: 'p6-r9-p30', desc: 'Rebuffering mid-stream' },
+    { spec: 'p12-e404',  desc: 'In-stream 404 error' },
+    { spec: 'p12-r-e',   desc: 'End-of-stream error after rebuffer' },
   ];
 
   const NAMED = [
-    { spec: 'example',                desc: '5s startup delay, 30s playback, then 404 error' },
+    { spec: 'example',                desc: '5s startup delay, 12s playback, then 404 error' },
     { spec: 'abr-example',            desc: 'Force player to low rendition, then make it unavailable' },
-    { spec: 'stall-and-recover',      desc: '10s playback, 8s stall, then 10s more playback' },
+    { spec: 'stall-and-recover',      desc: '12s playback, 8s stall, then 10s more playback' },
     { spec: 'multiple-stalls',        desc: 'Multiple rebuffer events' },
     { spec: 'network-congestion',     desc: 'Simulates a congested network at 500kbps' },
     { spec: 'abr-rendition-fallback', desc: 'High and mid renditions unavailable — player must fall back to low' },
