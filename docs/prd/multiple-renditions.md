@@ -17,3 +17,7 @@ Scenarios developers would like to test (with this and additional tools):
 - How the player ABR behavior behaves when thoughput can support higher or lower renditions
 - Player behavior when a rendition can't be downloaded or returns an error
 - Events are fired correctly as renditions change
+
+## Specifications
+
+- Segment filenames in the manifests should denote the bandwidth of the rendition. For example, the 400000 rendition should have a filename like: seg-high-1.m4s. The actual files coming from the disk will be seg-X.m4s but they would be re-written as served to the player.

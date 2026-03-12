@@ -42,8 +42,7 @@ app.use(async ctx => {
           outputError(ctx, renditionError);
         } else {
           const mediaLength = calculateMediaLength(spec.operations);
-          const hasSegmentError = renditionName && !!spec.renditionErrors.segment[renditionName];
-          await generateRendition(ctx, mediaLength, renditionName, hasSegmentError);
+          await generateRendition(ctx, mediaLength, renditionName);
         }
         break;
       }
@@ -112,7 +111,7 @@ function generateMediaPlaylist(ctx, spec) {
   outputString(ctx, 'application/x-mpegURL', playlist);
 }
 
-function generateRendition(ctx, medialength, renditionName, hasSegmentError) {
+function generateRendition(ctx, medialength, renditionName) {
   const start =
 `#EXTM3U
 #EXT-X-VERSION:7
@@ -125,7 +124,7 @@ function generateRendition(ctx, medialength, renditionName, hasSegmentError) {
   let segments = '';
 
   for (let i = 0; i < medialength / segmentLength; i++) {
-    const segFile = hasSegmentError ? `rendition-${renditionName}-seg-${i+1}.m4s` : `seg-${i+1}.m4s`;
+    const segFile = renditionName ? `seg-${renditionName}-${i+1}.m4s` : `seg-${i+1}.m4s`;
     segments +=
 `\n#EXTINF:6.006,
 ${segFile}`;
@@ -162,9 +161,7 @@ async function processSegment(ctx, timeline, time, requestedFilename) {
   const segment = timeline.find((el) => el.segment === segmentNum);
 
   const ext = path.extname(requestedFilename);
-  const baseName = path.basename(requestedFilename, ext);
-  const segMatch = baseName.match(/^seg-(\d+)$/);
-  const requestedSegNum = segMatch ? parseInt(segMatch[1]) : NaN;
+  const { segment: requestedSegNum } = extractRenditionFromSegment(path.basename(requestedFilename));
   const NUM_SEGMENTS = 5;
   const filename = isNaN(requestedSegNum)
     ? `seg-1${ext}`

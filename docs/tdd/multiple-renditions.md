@@ -60,7 +60,7 @@ The current server simulates one rendition. Real ABR players choose from multipl
 
 **Bandwidth throttle** is global — all segment delivery is throttled to the specified kbps. The player measures throughput and its ABR algorithm selects the appropriate rendition. Delay ops take precedence over bandwidth throttle when both apply.
 
-All renditions share the same segment URL namespace (`0.ts`, `1.ts`, etc.) — there are no per-rendition segment paths.
+**Rendition-named segment filenames** — every named rendition's playlist uses segment filenames that include the rendition name (e.g., `rendition-low-seg-1.m4s`). This lets the server always identify which rendition a segment request belongs to. Single-rendition and unnamed renditions continue to use plain `seg-{n}.m4s` filenames.
 
 ---
 
@@ -85,9 +85,22 @@ rendition-high.m3u8
 
 ### HLS Rendition Playlists
 
-`/spec/rendition-low.m3u8`, `/spec/rendition-mid.m3u8`, etc. — each returns a VOD playlist with shared segment numbers. Returns an HTTP error if that rendition has a matching `renditionErrors` entry.
+`/spec/rendition-low.m3u8`, `/spec/rendition-mid.m3u8`, etc. — each returns a VOD playlist. Named renditions use rendition-named segment filenames:
 
-`rendition.m3u8` remains valid for single-rendition inline specs (backward compatibility).
+```
+#EXTM3U
+...
+#EXTINF:6.006,
+seg-low-1.m4s
+#EXTINF:6.006,
+seg-low-2.m4s
+...
+#EXT-X-ENDLIST
+```
+
+Returns an HTTP error if that rendition has a matching `renditionErrors` entry.
+
+`rendition.m3u8` (single-rendition) continues to use plain `seg-{n}.m4s` filenames.
 
 ### DASH Manifest
 
@@ -129,13 +142,15 @@ rendition-high.m3u8
 - `resolveRenditions(spec)` — normalizes renditions array; no per-rendition operations merging
 - `resolveRenditionErrors(operations)` — scans ops for `error` entries with `rendition` field; returns `{ name: code }` map
 - `createSegmentTimeline()` — skips rendition-targeted ops; handles `bandwidth` op
+- `calculateElapsedPlayheadTime()` — must handle both `rendition-{name}-seg-{n}.m4s` and plain `seg-{n}.m4s`; extract segment number from either format
 
 ### `app.js`
 
 - `loadSpecification()` — returns `{ operations, renditions, renditionErrors }`; global ops filter excludes rendition-targeted errors
 - `generateMediaPlaylist()` — uses `rendition-${r.name}.m3u8` for named renditions, `rendition-${i}.m3u8` fallback
+- `generateRendition()` — always uses `seg-${renditionName}-${i+1}.m4s` when a rendition name is present; plain `seg-${i+1}.m4s` for unnamed/single-rendition. Removes `hasSegmentError` special-casing.
 - Rendition case — `extractRenditionName(filename)` lookup in `spec.renditionErrors`; returns HTTP error if found
-- `processSegment()` — reverse-scans timeline for active `bandwidthKbps`; passes to `outputFile()`
+- `processSegment()` — reverse-scans timeline for active `bandwidthKbps`; passes to `outputFile()`; segment number extraction must handle both `rendition-{name}-seg-{n}.m4s` and plain `seg-{n}.m4s`
 - `outputFile()` — added `bandwidthKbps` param; throttles at `kbps * 1000 / 8 / 10` bytes per 100ms when no delay active
 - `generateDashMPD()` — uses `r.name` for representation ID when available
 
