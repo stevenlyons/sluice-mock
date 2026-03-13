@@ -1,14 +1,16 @@
 {
   "description": "Force player to low rendition, then make it unavailable",
   "renditions": [
-    { "name": "low",  "bandwidth": 400000,  "resolution": "640x360" },
     { "name": "mid",  "bandwidth": 2493700, "resolution": "1280x720" },
-    { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" }
+    { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" },
+    { "name": "low",  "bandwidth": 400000,  "resolution": "640x360" }
   ],
   "operations": [
-    { "op": "bandwidth", "kbps": 300 },
-    { "op": "startup",   "delay": 5 },
-    { "op": "playback",  "time": 30 },
-    { "op": "error",     "code": 404, "rendition": "low" }
+    { "op": "bandwidth", "kbps": 4000 },
+    { "op": "startup", "delay": 5 },
+    { "op": "playback", "time": 18 },
+    { "op": "error", "code": 404, "rendition": "mid" },
+    { "op": "playback", "time": 6 },
+    { "op": "error", "code": 404, "rendition": "low", "on": "segment" }
   ]
 }
