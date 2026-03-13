@@ -8,7 +8,7 @@ const { segmentLength, shouldIgnoreRequest, checkRequestType,
         extractRenditionName, resolveRenditions, resolveRenditionErrors,
         extractRenditionFromSegment, parseSpecification, createSegmentTimeline,
         calculateElapsedPlayheadTime, calculateMediaLength,
-        extractMimetype, findBox } = require('./lib/logic');
+        extractMimetype, findBox, padSegmentBuffer } = require('./lib/logic');
 
 // Caches
 let specCache = {};
@@ -66,7 +66,10 @@ app.use(async ctx => {
         }
         const timeline = timelineCache[filepath];
         const time = calculateElapsedPlayheadTime(filename);
-        await processSegment(ctx, timeline, time, filename);
+        const renditionBandwidth = segRendition
+          ? spec.renditions.find(r => r.name === segRendition)?.bandwidth
+          : undefined;
+        await processSegment(ctx, timeline, time, filename, renditionBandwidth);
         break;
       }
       default:
@@ -154,7 +157,7 @@ ${representations}
   outputString(ctx, 'application/dash+xml', mpd);
 }
 
-async function processSegment(ctx, timeline, time, requestedFilename) {
+async function processSegment(ctx, timeline, time, requestedFilename, renditionBandwidth) {
   if (!timeline || time === undefined) return;
 
   const segmentNum = Math.ceil(time / segmentLength);
@@ -181,13 +184,13 @@ async function processSegment(ctx, timeline, time, requestedFilename) {
 
     // Delayed playback for startup or rebuffer (delay takes precedence over bandwidth)
     if (segment.delay > 0) {
-      await outputFile(ctx, '/media', filename, segment.delay, 0, requestedSegNum);
+      await outputFile(ctx, '/media', filename, segment.delay, 0, requestedSegNum, renditionBandwidth);
       return;
     }
   }
 
   // Nominal playback with optional bandwidth throttle
-  await outputFile(ctx, '/media', filename, 0, bandwidthKbps, requestedSegNum);
+  await outputFile(ctx, '/media', filename, 0, bandwidthKbps, requestedSegNum, renditionBandwidth);
 };
 
 // Output
@@ -196,7 +199,7 @@ function outputError(ctx, code) {
   ctx.throw(code);
 }
 
-async function outputFile(ctx, filepath, filename, delay = 0, bandwidthKbps = 0, sequenceNumber = null) {
+async function outputFile(ctx, filepath, filename, delay = 0, bandwidthKbps = 0, sequenceNumber = null, renditionBandwidth = undefined) {
   const fpath = path.join(__dirname, filepath, filename);
   const fstat = await stat(fpath);
 
@@ -205,10 +208,9 @@ async function outputFile(ctx, filepath, filename, delay = 0, bandwidthKbps = 0,
     const ext = temp.charAt(0) === '.' ? extractMimetype(temp.substring(1)) : temp;
 
     ctx.type = ext;
-    ctx.length = fstat.size;
 
     if (sequenceNumber !== null && !isNaN(sequenceNumber) && path.extname(filename) === '.m4s') {
-      const buf = await fs.promises.readFile(fpath);
+      let buf = await fs.promises.readFile(fpath);
       // Patch the mfhd sequence_number at byte offset 20:
       // moof header (8) + mfhd header (8) + version/flags (4) = 20
       buf.writeUInt32BE(sequenceNumber, 20);
@@ -220,14 +222,20 @@ async function outputFile(ctx, filepath, filename, delay = 0, bandwidthKbps = 0,
         const decodeTime = BigInt(144144) * BigInt(sequenceNumber - 1);
         buf.writeBigUInt64BE(decodeTime, tfdtOffset + 12); // version=1, 64-bit field
       }
+      if (renditionBandwidth) {
+        const targetBytes = Math.round(renditionBandwidth * segmentLength / 8);
+        buf = padSegmentBuffer(buf, targetBytes);
+      }
+      ctx.length = buf.length;
       ctx.body = Readable.from(buf);
     } else {
+      ctx.length = fstat.size;
       ctx.body = fs.createReadStream(fpath);
     }
 
     if (delay > 0) {
-      // Calculate the number of bits per 100ms interval to throttle the file to the specified time
-      const chunk = (fstat.size / 10) / delay;
+      // Calculate the number of bytes per 100ms interval to throttle the file to the specified time
+      const chunk = (ctx.length / 10) / delay;
       const throttler = throttle({rate: 100, chunk: chunk});
       await throttler(ctx, () => {;});
     } else if (bandwidthKbps > 0) {
