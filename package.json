@@ -4,7 +4,7 @@
   "scripts": {
     "start": "node app.js",
     "dev": "node --watch app.js",
-    "test": "node --test lib/logic.test.js app.test.js"
+    "test": "node --test lib/logic.test.js lib/manifest.test.js app.test.js"
   },
   "dependencies": {
     "koa": "^3.1.2",

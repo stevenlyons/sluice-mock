@@ -9,6 +9,7 @@ const { segmentLength, shouldIgnoreRequest, checkRequestType,
         extractRenditionFromSegment, parseSpecification, createSegmentTimeline,
         calculateElapsedPlayheadTime, calculateMediaLength,
         extractMimetype, findBox, padSegmentBuffer } = require('./lib/logic');
+const { buildMasterPlaylist, buildRenditionPlaylist, buildDashMPD } = require('./lib/manifest');
 
 // Caches
 let specCache = {};
@@ -32,7 +33,7 @@ app.use(async ctx => {
   switch (checkRequestType(filename)) {
     case 'media':
       console.log('Media request');
-      await generateMediaPlaylist(ctx, spec);
+      outputString(ctx, 'application/x-mpegURL', buildMasterPlaylist(spec.renditions));
       break;
     case 'rendition': {
       console.log('Rendition request');
@@ -41,13 +42,13 @@ app.use(async ctx => {
       if (renditionError) {
         outputError(ctx, renditionError);
       } else {
-        await generateRendition(ctx, spec.mediaLength, renditionName);
+        outputString(ctx, 'application/x-mpegURL', buildRenditionPlaylist(spec.mediaLength, renditionName));
       }
       break;
     }
     case 'dash-manifest': {
       console.log('DASH manifest request');
-      await generateDashMPD(ctx, spec.mediaLength, spec.renditions);
+      outputString(ctx, 'application/dash+xml', buildDashMPD(spec.mediaLength, spec.renditions));
       break;
     }
     case 'segment': {
@@ -100,64 +101,6 @@ async function loadSpecification(filepath) {
     const mediaLength = calculateMediaLength(operations);
     return { operations, mediaLength, renditions: resolveRenditions({ operations }), renditionErrors: { playlist: {}, segment: {} } };
   }
-}
-
-// Request handlers
-
-function generateMediaPlaylist(ctx, spec) {
-  const defaultCodecs = 'mp4a.40.2,avc1.640020';
-  let playlist = '#EXTM3U\n#EXT-X-VERSION:7';
-
-  spec.renditions.forEach((r, i) => {
-    const codecs = r.codecs || defaultCodecs;
-    const renditionFile = r.name ? `rendition-${r.name}.m3u8` : `rendition-${i}.m3u8`;
-    playlist += `\n\n#EXT-X-STREAM-INF:BANDWIDTH=${r.bandwidth},RESOLUTION=${r.resolution},CODECS="${codecs}"\n${renditionFile}`;
-  });
-
-  outputString(ctx, 'application/x-mpegURL', playlist);
-}
-
-function generateRendition(ctx, mediaLength, renditionName) {
-  const start =
-`#EXTM3U
-#EXT-X-VERSION:7
-#EXT-X-TARGETDURATION:7
-#EXT-X-PLAYLIST-TYPE:VOD
-#EXT-X-INDEPENDENT-SEGMENTS
-#EXT-X-MEDIA-SEQUENCE:0
-#EXT-X-MAP:URI="init.mp4"`;
-  const end = `\n#EXT-X-ENDLIST`;
-  let segments = '';
-
-  for (let i = 0; i < mediaLength / segmentLength; i++) {
-    const segFile = renditionName ? `seg-${renditionName}-${i+1}.m4s` : `seg-${i+1}.m4s`;
-    segments +=
-`\n#EXTINF:6.006,
-${segFile}`;
-  }
-
-  outputString(ctx, 'application/x-mpegURL', start + segments + end);
-}
-
-function generateDashMPD(ctx, mediaLength, renditions) {
-  const representations = renditions.map((r, i) => {
-    const [width, height] = r.resolution.split('x');
-    const id = r.name || (i + 1);
-    return `      <Representation id="${id}" bandwidth="${r.bandwidth}" codecs="avc1.640020" width="${width}" height="${height}"/>`;
-  }).join('\n');
-
-  const mpd =
-`<?xml version="1.0" encoding="UTF-8"?>
-<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="PT${mediaLength}S" minBufferTime="PT2S">
-  <Period>
-    <AdaptationSet mimeType="video/mp4" segmentAlignment="true">
-      <SegmentTemplate initialization="init.mp4" media="seg-$Number$.m4s" duration="6006" timescale="1000" startNumber="1"/>
-${representations}
-    </AdaptationSet>
-  </Period>
-</MPD>`;
-
-  outputString(ctx, 'application/dash+xml', mpd);
 }
 
 async function processSegment(ctx, timeline, time, requestedFilename, renditionBandwidth) {

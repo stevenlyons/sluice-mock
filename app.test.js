@@ -216,8 +216,8 @@ describe('loadSpecification', () => {
     assert.deepEqual(spec.renditionErrors, {
       playlist: {},
       segment: {
-        mid: { code: 404, activateAtSegment: 3 },
-        low: { code: 404, activateAtSegment: 4 },
+        mid: { code: 404, activateAtSegment: 2 },
+        low: { code: 404, activateAtSegment: 3 },
       },
     });
   });
