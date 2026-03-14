@@ -2,12 +2,12 @@
 
 ## Overview
 
-Publish `sluice-video-mock` to npm so developers can run it via `npx` or `bunx` without cloning the repository. Spec files are stored alongside the consuming project's source code and resolved from the working directory at runtime.
+Publish `sluice-mock` to npm so developers can run it via `npx` or `bunx` without cloning the repository. Spec files are stored alongside the consuming project's source code and resolved from the working directory at runtime.
 
 ## Goals
 
-- `npx sluice-video-mock` starts the server from any project directory
-- `bunx sluice-video-mock` works identically
+- `npx sluice-mock` starts the server from any project directory
+- `bunx sluice-mock` works identically
 - Spec JSON files live in the consumer project (e.g., `specs/`) and are committed to their VCS
 - No changes to the URL API or existing spec format
 
@@ -19,10 +19,10 @@ Publish `sluice-video-mock` to npm so developers can run it via `npx` or `bunx` 
 
 ```json
 {
-  "name": "sluice-video-mock",
+  "name": "sluice-mock",
   "version": "0.3.0",
   "bin": {
-    "sluice-video-mock": "./bin/sluice-video-mock.js"
+    "sluice-mock": "./bin/sluice-mock.js"
   },
   "files": [
     "app.js",
@@ -38,7 +38,7 @@ Publish `sluice-video-mock` to npm so developers can run it via `npx` or `bunx` 
 
 The `files` array controls what gets published to npm. `specs/` is intentionally omitted — specs come from the consumer project.
 
-### `bin/sluice-video-mock.js`
+### `bin/sluice-mock.js`
 
 New thin CLI entry point:
 
@@ -114,19 +114,19 @@ After publishing to npm, a developer integrates the tool as follows:
 
 **Option A — npx (no install)**
 ```bash
-npx sluice-video-mock
-npx sluice-video-mock 8080
-npx sluice-video-mock --specs ./test/fixtures/specs
+npx sluice-mock
+npx sluice-mock 8080
+npx sluice-mock --specs ./test/fixtures/specs
 ```
 
 **Option B — devDependency**
 ```json
 {
   "devDependencies": {
-    "sluice-video-mock": "^0.3.0"
+    "sluice-mock": "^0.3.0"
   },
   "scripts": {
-    "mock": "sluice-video-mock"
+    "mock": "sluice-mock"
   }
 }
 ```
@@ -136,8 +136,8 @@ npm run mock
 
 **Option C — Bun**
 ```bash
-bunx sluice-video-mock
-bun run sluice-video-mock  # if installed as devDependency
+bunx sluice-mock
+bun run sluice-mock  # if installed as devDependency
 ```
 
 **Spec files in the consumer project:**
@@ -179,14 +179,14 @@ npm publish         # requires npm login with publish rights
 
 After publish, verify with:
 ```bash
-npx sluice-video-mock@latest --version   # if --version flag is added
-npx sluice-video-mock@latest 3031        # smoke test
+npx sluice-mock@latest --version   # if --version flag is added
+npx sluice-mock@latest 3031        # smoke test
 ```
 
 ---
 
 ## Open Questions
 
-1. **npm package name** — Is `sluice-video-mock` available on npm, or do we need a scoped name like `@acme/sluice-video-mock`?
+1. **npm package name** — Is `sluice-mock` available on npm, or do we need a scoped name like `@acme/sluice-mock`?
 2. **`--version` flag** — Should the CLI support `--version` to print the current package version?
 3. **Bun-specific testing** — Do we need to verify Bun compatibility explicitly, or is running under Node sufficient?

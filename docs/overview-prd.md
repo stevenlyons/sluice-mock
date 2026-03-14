@@ -1,4 +1,4 @@
-sluice-video-mock helps simulate internet video playback for use in player integration testing. It allows the developer to specify how the video delivery and playback should behave to factilite testing and validation of the player. 
+sluice-mock helps simulate internet video playback for use in player integration testing. It allows the developer to specify how the video delivery and playback should behave to factilite testing and validation of the player. 
 
 The tool can simulate the following behaviors:
 * Startup time
