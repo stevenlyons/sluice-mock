@@ -15,70 +15,68 @@ let specCache = {};
 let timelineCache = {};
 
 app.use(async ctx => {
-    const filepath = path.dirname(ctx.path);
-    const filename = path.basename(ctx.path);
+  const filepath = path.dirname(ctx.path);
+  const filename = path.basename(ctx.path);
 
-    console.log(`Request: path: ${filepath} name: ${filename}`);
+  console.log(`Request: path: ${filepath} name: ${filename}`);
 
-    if (shouldIgnoreRequest(filename)) return;
+  if (shouldIgnoreRequest(filename)) return;
 
-    if (!specCache[filepath]) {
-        specCache[filepath] = await loadSpecification(filepath);
-        console.log('loadSpecification: ' + filepath);
-        console.dir(specCache[filepath]);
+  if (!specCache[filepath]) {
+    specCache[filepath] = await loadSpecification(filepath);
+    console.log('loadSpecification: ' + filepath);
+    console.dir(specCache[filepath]);
+  }
+  const spec = specCache[filepath];
+
+  switch (checkRequestType(filename)) {
+    case 'media':
+      console.log('Media request');
+      await generateMediaPlaylist(ctx, spec);
+      break;
+    case 'rendition': {
+      console.log('Rendition request');
+      const renditionName = extractRenditionName(filename);
+      const renditionError = renditionName && spec.renditionErrors.playlist[renditionName];
+      if (renditionError) {
+        outputError(ctx, renditionError);
+      } else {
+        await generateRendition(ctx, spec.mediaLength, renditionName);
+      }
+      break;
     }
-    const spec = specCache[filepath];
-
-    switch (checkRequestType(filename)) {
-      case 'media':
-        console.log('Media request');
-        await generateMediaPlaylist(ctx, spec);
-        break;
-      case 'rendition': {
-        console.log('Rendition request');
-        const renditionName = extractRenditionName(filename);
-        const renditionError = renditionName && spec.renditionErrors.playlist[renditionName];
-        if (renditionError) {
-          outputError(ctx, renditionError);
-        } else {
-          const mediaLength = calculateMediaLength(spec.operations);
-          await generateRendition(ctx, mediaLength, renditionName);
-        }
-        break;
-      }
-      case 'dash-manifest': {
-        console.log('DASH manifest request');
-        const dashLength = calculateMediaLength(spec.operations);
-        await generateDashMPD(ctx, dashLength, spec.renditions);
-        break;
-      }
-      case 'segment': {
-        console.log('Segment request');
-        const { rendition: segRendition, segment: segNum } = extractRenditionFromSegment(filename);
-        if (segRendition && spec.renditionErrors.segment[segRendition]) {
-          const err = spec.renditionErrors.segment[segRendition];
-          if (segNum >= err.activateAtSegment) {
-            outputError(ctx, err.code);
-            break;
-          }
-        }
-        if (!timelineCache[filepath]) {
-            timelineCache[filepath] = createSegmentTimeline(spec.operations);
-            console.log('createSegmentTimeline:');
-            console.dir(timelineCache[filepath]);
-        }
-        const timeline = timelineCache[filepath];
-        const time = calculateElapsedPlayheadTime(filename);
-        const renditionBandwidth = segRendition
-          ? spec.renditions.find(r => r.name === segRendition)?.bandwidth
-          : undefined;
-        await processSegment(ctx, timeline, time, filename, renditionBandwidth);
-        break;
-      }
-      default:
-        await outputFile(ctx, '/media', filename);
-        break;
+    case 'dash-manifest': {
+      console.log('DASH manifest request');
+      await generateDashMPD(ctx, spec.mediaLength, spec.renditions);
+      break;
     }
+    case 'segment': {
+      console.log('Segment request');
+      const { rendition: segRendition, segment: segNum } = extractRenditionFromSegment(filename);
+      if (segRendition && spec.renditionErrors.segment[segRendition]) {
+        const err = spec.renditionErrors.segment[segRendition];
+        if (segNum >= err.activateAtSegment) {
+          outputError(ctx, err.code);
+          break;
+        }
+      }
+      if (!timelineCache[filepath]) {
+        timelineCache[filepath] = createSegmentTimeline(spec.operations);
+        console.log('createSegmentTimeline:');
+        console.dir(timelineCache[filepath]);
+      }
+      const timeline = timelineCache[filepath];
+      const time = calculateElapsedPlayheadTime(filename);
+      const renditionBandwidth = segRendition
+        ? spec.renditions.find(r => r.name === segRendition)?.bandwidth
+        : undefined;
+      await processSegment(ctx, timeline, time, filename, renditionBandwidth);
+      break;
+    }
+    default:
+      await outputFile(ctx, '/media', filename);
+      break;
+  }
 });
 
 const portFlagIndex = process.argv.findIndex(a => a === '--port' || a === '-p');
@@ -95,10 +93,12 @@ async function loadSpecification(filepath) {
     const json = JSON.parse(contents);
     const operations = json.operations || [];
     const renditionErrors = resolveRenditionErrors(json.operations);
-    return { operations, renditions: resolveRenditions(json), renditionErrors };
+    const mediaLength = calculateMediaLength(operations);
+    return { operations, mediaLength, renditions: resolveRenditions(json), renditionErrors };
   } catch {
     const operations = parseSpecification(filepath);
-    return { operations, renditions: resolveRenditions({ operations }), renditionErrors: { playlist: {}, segment: {} } };
+    const mediaLength = calculateMediaLength(operations);
+    return { operations, mediaLength, renditions: resolveRenditions({ operations }), renditionErrors: { playlist: {}, segment: {} } };
   }
 }
 
@@ -117,7 +117,7 @@ function generateMediaPlaylist(ctx, spec) {
   outputString(ctx, 'application/x-mpegURL', playlist);
 }
 
-function generateRendition(ctx, medialength, renditionName) {
+function generateRendition(ctx, mediaLength, renditionName) {
   const start =
 `#EXTM3U
 #EXT-X-VERSION:7
@@ -129,7 +129,7 @@ function generateRendition(ctx, medialength, renditionName) {
   const end = `\n#EXT-X-ENDLIST`;
   let segments = '';
 
-  for (let i = 0; i < medialength / segmentLength; i++) {
+  for (let i = 0; i < mediaLength / segmentLength; i++) {
     const segFile = renditionName ? `seg-${renditionName}-${i+1}.m4s` : `seg-${i+1}.m4s`;
     segments +=
 `\n#EXTINF:6.006,
@@ -179,7 +179,6 @@ async function processSegment(ctx, timeline, time, requestedFilename, renditionB
   const bandwidthKbps = bandwidthEntry?.bandwidthKbps;
 
   if (segment) {
-    // Throw an Error
     if (segment.error) {
       outputError(ctx, segment.error);
       return;
@@ -194,7 +193,7 @@ async function processSegment(ctx, timeline, time, requestedFilename, renditionB
 
   // Nominal playback with optional bandwidth throttle
   await outputFile(ctx, '/media', filename, 0, bandwidthKbps, requestedSegNum, renditionBandwidth);
-};
+}
 
 // Output
 
@@ -202,9 +201,28 @@ function outputError(ctx, code) {
   ctx.throw(code);
 }
 
+function patchM4sBuffer(buf, sequenceNumber, renditionBandwidth) {
+  // Patch the mfhd sequence_number at byte offset 20:
+  // moof header (8) + mfhd header (8) + version/flags (4) = 20
+  buf.writeUInt32BE(sequenceNumber, 20);
+  // Patch the tfdt baseMediaDecodeTime so each segment starts at the right point
+  // in the timeline regardless of which physical file is being served.
+  // 24000 (timescale) * 6.006s (segment duration) = 144144 ticks per segment
+  const tfdtOffset = findBox(buf, 'tfdt');
+  if (tfdtOffset !== -1) {
+    const decodeTime = BigInt(144144) * BigInt(sequenceNumber - 1);
+    buf.writeBigUInt64BE(decodeTime, tfdtOffset + 12); // version=1, 64-bit field
+  }
+  if (renditionBandwidth) {
+    const targetBytes = Math.round(renditionBandwidth * segmentLength / 8);
+    buf = padSegmentBuffer(buf, targetBytes);
+  }
+  return buf;
+}
+
 async function outputFile(ctx, filepath, filename, delay = 0, bandwidthKbps = 0, sequenceNumber = null, renditionBandwidth = undefined) {
   const fpath = path.join(__dirname, filepath, filename);
-  const fstat = await stat(fpath);
+  const fstat = await fs.promises.stat(fpath);
 
   if (fstat.isFile()) {
     const temp = path.extname(fpath);
@@ -214,21 +232,7 @@ async function outputFile(ctx, filepath, filename, delay = 0, bandwidthKbps = 0,
 
     if (sequenceNumber !== null && !isNaN(sequenceNumber) && path.extname(filename) === '.m4s') {
       let buf = await fs.promises.readFile(fpath);
-      // Patch the mfhd sequence_number at byte offset 20:
-      // moof header (8) + mfhd header (8) + version/flags (4) = 20
-      buf.writeUInt32BE(sequenceNumber, 20);
-      // Patch the tfdt baseMediaDecodeTime so each segment starts at the right point
-      // in the timeline regardless of which physical file is being served.
-      // 24000 (timescale) * 6.006s (segment duration) = 144144 ticks per segment
-      const tfdtOffset = findBox(buf, 'tfdt');
-      if (tfdtOffset !== -1) {
-        const decodeTime = BigInt(144144) * BigInt(sequenceNumber - 1);
-        buf.writeBigUInt64BE(decodeTime, tfdtOffset + 12); // version=1, 64-bit field
-      }
-      if (renditionBandwidth) {
-        const targetBytes = Math.round(renditionBandwidth * segmentLength / 8);
-        buf = padSegmentBuffer(buf, targetBytes);
-      }
+      buf = patchM4sBuffer(buf, sequenceNumber, renditionBandwidth);
       ctx.length = buf.length;
       ctx.body = Readable.from(buf);
     } else {
@@ -254,18 +258,3 @@ function outputString(ctx, type, body) {
   ctx.type = type;
   ctx.body = body;
 }
-
-// System functions
-
-function stat(file) {
-  return new Promise(function(resolve, reject) {
-    fs.stat(file, function(err, stat) {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(stat);
-      }
-    });
-  });
-}
-
