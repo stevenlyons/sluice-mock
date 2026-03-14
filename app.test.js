@@ -213,17 +213,23 @@ describe('loadSpecification', () => {
 
   it('resolves rendition errors from abr-example', async () => {
     const spec = await loadSpecification('/abr-example');
-    assert.deepEqual(spec.renditionErrors, { playlist: { mid: 404 }, segment: { low: 404 } });
+    assert.deepEqual(spec.renditionErrors, {
+      playlist: {},
+      segment: {
+        mid: { code: 404, activateAtSegment: 4 },
+        low: { code: 404, activateAtSegment: 6 },
+      },
+    });
   });
 
   it('resolves segment rendition errors from abr-rendition-segment-error', async () => {
     const spec = await loadSpecification('/abr-rendition-segment-error');
-    assert.deepEqual(spec.renditionErrors, { playlist: {}, segment: { low: 503 } });
+    assert.deepEqual(spec.renditionErrors, { playlist: {}, segment: { low: { code: 503, activateAtSegment: 6 } } });
   });
 
-  it('global operations exclude rendition-targeted error ops', async () => {
+  it('operations includes rendition-targeted error ops for media length calculation', async () => {
     const spec = await loadSpecification('/abr-example');
     const hasRenditionOp = spec.operations.some(op => op.rendition);
-    assert.equal(hasRenditionOp, false);
+    assert.equal(hasRenditionOp, true);
   });
 });

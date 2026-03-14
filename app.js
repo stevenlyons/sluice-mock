@@ -54,10 +54,13 @@ app.use(async ctx => {
       }
       case 'segment': {
         console.log('Segment request');
-        const { rendition: segRendition } = extractRenditionFromSegment(filename);
+        const { rendition: segRendition, segment: segNum } = extractRenditionFromSegment(filename);
         if (segRendition && spec.renditionErrors.segment[segRendition]) {
-          outputError(ctx, spec.renditionErrors.segment[segRendition]);
-          break;
+          const err = spec.renditionErrors.segment[segRendition];
+          if (segNum >= err.activateAtSegment) {
+            outputError(ctx, err.code);
+            break;
+          }
         }
         if (!timelineCache[filepath]) {
             timelineCache[filepath] = createSegmentTimeline(spec.operations);
@@ -90,7 +93,7 @@ async function loadSpecification(filepath) {
   try {
     const contents = await fs.promises.readFile(specFile, 'utf8');
     const json = JSON.parse(contents);
-    const operations = (json.operations || []).filter(op => !op.rendition);
+    const operations = json.operations || [];
     const renditionErrors = resolveRenditionErrors(json.operations);
     return { operations, renditions: resolveRenditions(json), renditionErrors };
   } catch {
