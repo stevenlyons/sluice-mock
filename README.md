@@ -108,3 +108,9 @@ The master playlist at `/my-scenario/media.m3u8` lists `rendition-low.m3u8`, `re
 ### Playing
 
 Use the URL, including the desired specification, with your favorite video player.
+
+## Credits
+
+Video sample credit to: 
+Ruvim Miksanskiy
+https://www.pexels.com/video/video-of-forest-1448735/
