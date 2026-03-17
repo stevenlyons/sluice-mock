@@ -18,8 +18,8 @@ The current server simulates one rendition. Real ABR players choose from multipl
 
 - Multi-rendition via **JSON spec files only** — inline strings stay single-rendition
 - Renditions are **named** — URLs use the name (`rendition-low.m3u8`), not an index
-- Bandwidth is a **global network property** — set via a top-level `bandwidth` op; the player's ABR algorithm chooses the rendition naturally based on measured throughput
-- **Rendition errors** are the only rendition-targeted operations — they make a specific quality level unavailable by returning an HTTP error when its playlist is requested
+- Bandwidth is a **global network property** — set via a top-level `bandwidth` cue; the player's ABR algorithm chooses the rendition naturally based on measured throughput
+- **Rendition errors** are the only rendition-targeted cues — they make a specific quality level unavailable by returning an HTTP error when its playlist is requested
 - Both **HLS and DASH** supported
 
 ---
@@ -34,11 +34,11 @@ The current server simulates one rendition. Real ABR players choose from multipl
     { "name": "mid",  "bandwidth": 2493700, "resolution": "1280x720" },
     { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" }
   ],
-  "operations": [
-    { "op": "bandwidth", "kbps": 300 },
-    { "op": "startup",   "delay": 5 },
-    { "op": "playback",  "time": 30 },
-    { "op": "error",     "code": 404, "rendition": "low" }
+  "timeline": [
+    { "cue": "bandwidth", "kbps": 300 },
+    { "cue": "startup",   "delay": 5 },
+    { "cue": "playback",  "time": 30 },
+    { "cue": "error",     "code": 404, "rendition": "low" }
   ]
 }
 ```
@@ -46,7 +46,7 @@ The current server simulates one rendition. Real ABR players choose from multipl
 - `renditions` array is optional — omitting it preserves single-rendition behavior
 - `name` is optional per rendition — unnamed renditions fall back to index-based URLs (`rendition-0.m3u8`)
 - `bandwidth` and `resolution` are required per rendition; `codecs` defaults to `"mp4a.40.2,avc1.640020"`
-- `bandwidth` op — global, sets sustained throughput throttle from that point forward
+- `bandwidth` cue — global, sets sustained throughput throttle from that point forward
 - `error` with `rendition` field — HTTP error when that rendition's playlist is requested (entire session)
 - `error` without `rendition` field — segment error at that timeline position (existing behavior)
 
@@ -54,11 +54,11 @@ The current server simulates one rendition. Real ABR players choose from multipl
 
 ## Behavior Model
 
-**Global operations** drive segment delivery — startup, playback, rebuffer, error (without rendition), and bandwidth ops all apply to the shared segment timeline.
+**Global cues** drive segment delivery — startup, playback, rebuffer, error (without rendition), and bandwidth cues all apply to the shared segment timeline.
 
 **Rendition errors** make a specific quality level unavailable. When the player requests `rendition-low.m3u8`, the server returns the specified HTTP error code. The player's ABR logic falls back to another rendition.
 
-**Bandwidth throttle** is global — all segment delivery is throttled to the specified kbps. The player measures throughput and its ABR algorithm selects the appropriate rendition. Delay ops take precedence over bandwidth throttle when both apply.
+**Bandwidth throttle** is global — all segment delivery is throttled to the specified kbps. The player measures throughput and its ABR algorithm selects the appropriate rendition. Delay cues take precedence over bandwidth throttle when both apply.
 
 **Rendition-named segment filenames** — every named rendition's playlist uses segment filenames that include the rendition name (e.g., `rendition-low-seg-1.m4s`). This lets the server always identify which rendition a segment request belongs to. Single-rendition and unnamed renditions continue to use plain `seg-{n}.m4s` filenames.
 
@@ -114,9 +114,9 @@ Returns an HTTP error if that rendition has a matching `renditionErrors` entry.
 
 ```js
 {
-  operations,      // global ops only (rendition-targeted ops excluded) — used for timeline and media length
+  timeline,        // global cues only (rendition-targeted cues excluded) — used for timeline and media length
   renditions,      // array of { name?, bandwidth, resolution, codecs? }
-  renditionErrors  // { 'low': 404, ... } — built from error ops with rendition field
+  renditionErrors  // { 'low': 404, ... } — built from error cues with rendition field
 }
 ```
 
@@ -126,8 +126,8 @@ Returns an HTTP error if that rendition has a matching `renditionErrors` entry.
 
 `createSegmentTimeline()` handles two new cases:
 
-- Ops with a `rendition` field are **skipped** — they are handled via `renditionErrors`, not the timeline
-- `bandwidth` op pushes `{ segment: currentSegment, bandwidthKbps: kbps }` — does not advance `currentSegment`
+- Cues with a `rendition` field are **skipped** — they are handled via `renditionErrors`, not the timeline
+- `bandwidth` cue pushes `{ segment: currentSegment, bandwidthKbps: kbps }` — does not advance `currentSegment`
 
 `processSegment()` finds the active bandwidth by scanning the timeline in reverse for the last `bandwidthKbps` entry at or before the current segment number, then passes it to `outputFile()`.
 
@@ -140,13 +140,13 @@ Returns an HTTP error if that rendition has a matching `renditionErrors` entry.
 - `checkRequestType()` — updated regex to `rendition-\w+` (word chars, not just digits)
 - `extractRenditionName(filename)` — `'rendition-low.m3u8'` → `'low'`, `'rendition.m3u8'` → `null`
 - `resolveRenditions(spec)` — normalizes renditions array; no per-rendition operations merging
-- `resolveRenditionErrors(operations)` — scans ops for `error` entries with `rendition` field; returns `{ name: code }` map
-- `createSegmentTimeline()` — skips rendition-targeted ops; handles `bandwidth` op
+- `resolveRenditionErrors(timeline)` — scans cues for `error` entries with `rendition` field; returns `{ name: code }` map
+- `createSegmentTimeline()` — skips rendition-targeted cues; handles `bandwidth` cue
 - `calculateElapsedPlayheadTime()` — must handle both `rendition-{name}-seg-{n}.m4s` and plain `seg-{n}.m4s`; extract segment number from either format
 
 ### `app.js`
 
-- `loadSpecification()` — returns `{ operations, renditions, renditionErrors }`; global ops filter excludes rendition-targeted errors
+- `loadSpecification()` — returns `{ timeline, renditions, renditionErrors }`; global cues filter excludes rendition-targeted errors
 - `generateMediaPlaylist()` — uses `rendition-${r.name}.m3u8` for named renditions, `rendition-${i}.m3u8` fallback
 - `generateRendition()` — always uses `seg-${renditionName}-${i+1}.m4s` when a rendition name is present; plain `seg-${i+1}.m4s` for unnamed/single-rendition. Removes `hasSegmentError` special-casing.
 - Rendition case — `extractRenditionName(filename)` lookup in `spec.renditionErrors`; returns HTTP error if found

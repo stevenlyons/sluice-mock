@@ -33,7 +33,7 @@ The entire server is a single file: `app.js`. It uses **Koa** as the HTTP framew
 1. A request arrives with a path like `/s5-p30-e404/media.m3u8` or `/my-scenario/media.m3u8`
 2. The path (directory portion) is the **spec identifier** — resolved once and cached in `specCache`
 3. `loadSpecification(filepath)` resolves the spec:
-   - Checks for `specs/<name>.json` — if found, reads and returns its `operations` array
+   - Checks for `specs/<name>.json` — if found, reads and returns its `timeline` array
    - Otherwise falls back to `parseSpecification(filepath)` for inline spec strings
 4. The filename determines the request type:
    - `media.m3u8` → dynamically generate an HLS master playlist listing all renditions
@@ -46,10 +46,10 @@ The entire server is a single file: `app.js`. It uses **Koa** as the HTTP framew
 Two modes for specifying playback behavior:
 
 **Inline spec strings** — encoded directly in the URL path, parsed by `parseSpecification(path)`:
-- `s<N>` → `{ op: 'startup', delay: N }`
-- `p<N>` → `{ op: 'playback', time: N }`
-- `r<N>` → `{ op: 'rebuffer', delay: N }`
-- `e<code>` → `{ op: 'error', code: N }`
+- `s<N>` → `{ cue: 'startup', delay: N }`
+- `p<N>` → `{ cue: 'playback', time: N }`
+- `r<N>` → `{ cue: 'rebuffer', delay: N }`
+- `e<code>` → `{ cue: 'error', code: N }`
 
 **Named spec files** — JSON files in `specs/` directory, referenced by name in the URL:
 ```json
@@ -59,11 +59,11 @@ Two modes for specifying playback behavior:
     { "name": "low",  "bandwidth": 400000,  "resolution": "640x360" },
     { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" }
   ],
-  "operations": [
-    { "op": "bandwidth", "kbps": 300 },
-    { "op": "startup",   "delay": 5 },
-    { "op": "playback",  "time": 30 },
-    { "op": "error",     "code": 404, "rendition": "low" }
+  "timeline": [
+    { "cue": "bandwidth", "kbps": 300 },
+    { "cue": "startup",   "delay": 5 },
+    { "cue": "playback",  "time": 30 },
+    { "cue": "error",     "code": 404, "rendition": "low" }
   ]
 }
 ```
@@ -73,22 +73,22 @@ Two modes for specifying playback behavior:
 - `bandwidth` and `resolution` are required per rendition; `codecs` defaults to `"mp4a.40.2,avc1.640020"`
 - `error` with `rendition` field → HTTP error when that rendition's playlist is requested (makes that quality level unavailable)
 - `error` without `rendition` → segment error at that timeline position (existing behavior)
-- `bandwidth` op → sets global sustained throughput throttle from that point forward; the player's ABR algorithm decides which rendition to use
+- `bandwidth` cue → sets global sustained throughput throttle from that point forward; the player's ABR algorithm decides which rendition to use
 
 ### Spec Object Shape
 
 `loadSpecification()` returns:
 ```js
 {
-  operations,      // global ops (no rendition field) — used for segment timeline and media length
+  timeline,        // global cues (no rendition field) — used for segment timeline and media length
   renditions,      // array of { name?, bandwidth, resolution, codecs? }
-  renditionErrors  // { 'low': 404 } — from error ops with rendition field
+  renditionErrors  // { 'low': 404 } — from error cues with rendition field
 }
 ```
 
 ### Segment Timeline
 
-`createSegmentTimeline(operations)` maps operations to specific segment numbers. Only segments with special behavior (delay, bandwidth throttle, or error) appear in the timeline array — everything else is nominal playback. The timeline is cached in `timelineCache`.
+`createSegmentTimeline(timeline)` maps cues to specific segment numbers. Only segments with special behavior (delay, bandwidth throttle, or error) appear in the timeline array — everything else is nominal playback. The timeline is cached in `timelineCache`.
 
 Supported timeline entry types:
 - `{ segment: N, delay: X }` — startup or rebuffer delay

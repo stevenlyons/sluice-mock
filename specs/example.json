@@ -1,8 +1,8 @@
 {
   "description": "5s startup delay, 30s playback, then 404 error",
-  "operations": [
-    { "op": "startup", "delay": 5 },
-    { "op": "playback", "time": 12 },
-    { "op": "error", "code": 404 }
+  "timeline": [
+    { "cue": "startup", "delay": 5 },
+    { "cue": "playback", "time": 12 },
+    { "cue": "error", "code": 404 }
   ]
 }

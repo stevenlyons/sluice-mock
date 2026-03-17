@@ -13,15 +13,15 @@ JSON files stored in a `specs/` directory at the project root. Named by scenario
 ```json
 {
   "description": "5s startup delay, 30s playback, then 404 error",
-  "operations": [
-    { "op": "startup", "delay": 5 },
-    { "op": "playback", "time": 30 },
-    { "op": "error", "code": 404 }
+  "timeline": [
+    { "cue": "startup", "delay": 5 },
+    { "cue": "playback", "time": 30 },
+    { "cue": "error", "code": 404 }
   ]
 }
 ```
 
-The `operations` array maps directly to the existing operation objects consumed by `createSegmentTimeline()` and `calculateMediaLength()` in `lib/logic.js` — no changes needed to those functions.
+The `timeline` array maps directly to the existing cue objects consumed by `createSegmentTimeline()` and `calculateMediaLength()` in `lib/logic.js` — no changes needed to those functions.
 
 The `description` field is optional.
 
@@ -42,7 +42,7 @@ In `app.js`, replace the direct `parseSpecification()` call with a new async `lo
 
 1. Strip the leading `/` from `filepath` to get the spec name
 2. Check if `specs/<name>.json` exists
-3. If yes → read the file, return `parsed.operations`
+3. If yes → read the file, return `parsed.timeline`
 4. If no → fall back to `parseSpecification(filepath)` (existing inline parsing)
 
 The existing `specCache` already handles per-filepath caching, so the file is only read once per server instance.
@@ -62,7 +62,7 @@ async function loadSpecification(filepath) {
   const specFile = path.join(__dirname, 'specs', `${name}.json`);
   try {
     const contents = await fs.promises.readFile(specFile, 'utf8');
-    return JSON.parse(contents).operations;
+    return JSON.parse(contents).timeline;
   } catch {
     return parseSpecification(filepath);
   }
@@ -84,7 +84,7 @@ No changes to `lib/logic.js` — `createSegmentTimeline()`, `calculateMediaLengt
 
 ## Verification
 
-1. Create `specs/test-scenario.json` with known operations
+1. Create `specs/test-scenario.json` with known cues
 2. Start server: `node app.js`
 3. `curl http://localhost:3030/test-scenario/rendition.m3u8` — should return correct segment count
 4. `curl http://localhost:3030/s5-p30/rendition.m3u8` — inline spec still works

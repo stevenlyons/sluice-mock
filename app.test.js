@@ -1,8 +1,11 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
+const os = require('node:os');
+const fs = require('node:fs');
+const path = require('node:path');
 const app = require('./app');
-const { loadSpecification } = app;
+const { loadSpecification, resolveSpecsDir } = app;
 const { findBox } = require('./lib/logic');
 
 function readTfdt(buf) {
@@ -28,6 +31,66 @@ function get(server, path) {
     req.on('error', reject);
   });
 }
+
+describe('resolveSpecsDir', () => {
+  it('default: returns path.join(process.cwd(), "specs")', () => {
+    const origArgv = process.argv;
+    const origEnv = process.env.SLUICE_SPECS;
+    try {
+      process.argv = ['node', 'app.js'];
+      delete process.env.SLUICE_SPECS;
+      assert.equal(resolveSpecsDir(), path.join(process.cwd(), 'specs'));
+    } finally {
+      process.argv = origArgv;
+      if (origEnv !== undefined) process.env.SLUICE_SPECS = origEnv;
+    }
+  });
+
+  it('--specs flag: returns resolved path from flag value', () => {
+    const origArgv = process.argv;
+    const origEnv = process.env.SLUICE_SPECS;
+    try {
+      process.argv = ['node', 'app.js', '--specs', '/tmp/my-specs'];
+      delete process.env.SLUICE_SPECS;
+      assert.equal(resolveSpecsDir(), path.resolve('/tmp/my-specs'));
+    } finally {
+      process.argv = origArgv;
+      if (origEnv !== undefined) process.env.SLUICE_SPECS = origEnv;
+    }
+  });
+
+  it('SLUICE_SPECS env var: returns resolved path from env var', () => {
+    const origArgv = process.argv;
+    const origEnv = process.env.SLUICE_SPECS;
+    try {
+      process.argv = ['node', 'app.js'];
+      process.env.SLUICE_SPECS = '/tmp/env-specs';
+      assert.equal(resolveSpecsDir(), path.resolve('/tmp/env-specs'));
+    } finally {
+      process.argv = origArgv;
+      if (origEnv !== undefined) process.env.SLUICE_SPECS = origEnv;
+      else delete process.env.SLUICE_SPECS;
+    }
+  });
+
+  it('loadSpecification reads from custom specsDir via SLUICE_SPECS', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sluice-test-'));
+    const origArgv = process.argv;
+    const origEnv = process.env.SLUICE_SPECS;
+    try {
+      const spec = { timeline: [{ cue: 'playback', time: 10 }] };
+      fs.writeFileSync(path.join(tmpDir, 'custom-spec.json'), JSON.stringify(spec));
+      process.argv = ['node', 'app.js', '--specs', tmpDir];
+      delete process.env.SLUICE_SPECS;
+      const result = await loadSpecification('/custom-spec');
+      assert.deepEqual(result.timeline, spec.timeline);
+    } finally {
+      process.argv = origArgv;
+      if (origEnv !== undefined) process.env.SLUICE_SPECS = origEnv;
+      fs.rmSync(tmpDir, { recursive: true });
+    }
+  });
+});
 
 describe('mfhd sequence_number patching', () => {
   let server;
@@ -158,12 +221,12 @@ describe('per-rendition segment sizing', () => {
 });
 
 describe('loadSpecification', () => {
-  it('loads operations from a named spec file', async () => {
+  it('loads timeline from a named spec file', async () => {
     const spec = await loadSpecification('/example');
-    assert.deepEqual(spec.operations, [
-      { op: 'startup', delay: 5 },
-      { op: 'playback', time: 12 },
-      { op: 'error', code: 404 },
+    assert.deepEqual(spec.timeline, [
+      { cue: 'startup', delay: 5 },
+      { cue: 'playback', time: 12 },
+      { cue: 'error', code: 404 },
     ]);
   });
 
@@ -180,19 +243,19 @@ describe('loadSpecification', () => {
 
   it('falls back to inline parsing when spec file does not exist', async () => {
     const spec = await loadSpecification('/s5-p30-e404');
-    assert.deepEqual(spec.operations, [
-      { op: 'startup', delay: 5 },
-      { op: 'playback', time: 30 },
-      { op: 'error', code: 404 },
+    assert.deepEqual(spec.timeline, [
+      { cue: 'startup', delay: 5 },
+      { cue: 'playback', time: 30 },
+      { cue: 'error', code: 404 },
     ]);
   });
 
   it('handles filepath without leading slash', async () => {
     const spec = await loadSpecification('example');
-    assert.deepEqual(spec.operations, [
-      { op: 'startup', delay: 5 },
-      { op: 'playback', time: 12 },
-      { op: 'error', code: 404 },
+    assert.deepEqual(spec.timeline, [
+      { cue: 'startup', delay: 5 },
+      { cue: 'playback', time: 12 },
+      { cue: 'error', code: 404 },
     ]);
   });
 
@@ -227,9 +290,9 @@ describe('loadSpecification', () => {
     assert.deepEqual(spec.renditionErrors, { playlist: {}, segment: { low: { code: 503, activateAtSegment: 6 } } });
   });
 
-  it('operations includes rendition-targeted error ops for media length calculation', async () => {
+  it('timeline includes rendition-targeted error cues for media length calculation', async () => {
     const spec = await loadSpecification('/abr-example');
-    const hasRenditionOp = spec.operations.some(op => op.rendition);
-    assert.equal(hasRenditionOp, true);
+    const hasRenditionCue = spec.timeline.some(cue => cue.rendition);
+    assert.equal(hasRenditionCue, true);
   });
 });

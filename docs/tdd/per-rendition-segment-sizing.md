@@ -22,7 +22,7 @@ All renditions previously served the same physical segment files (~4.5MB each) r
 - **Target size formula**: `Math.round(bandwidth × segmentLength / 8)` bytes
 - **Single-rendition fallback** — inline specs (one rendition) use that rendition's bandwidth for sizing
 - **No bandwidth available** — serve file as-is (no padding)
-- **Global bandwidth throttle** continues to work on top of sizing; they are independent
+- **Global bandwidth throttle cue** continues to work on top of sizing; they are independent
 
 ---
 
@@ -153,8 +153,8 @@ Integration tests use `abr-sizing-test` (playback-only spec, no throttle) to ver
     { "name": "low",  "bandwidth": 600000,  "resolution": "640x360" },
     { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" }
   ],
-  "operations": [
-    { "op": "playback", "time": 30 }
+  "timeline": [
+    { "cue": "playback", "time": 30 }
   ]
 }
 ```

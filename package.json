@@ -1,6 +1,27 @@
 {
   "name": "sluice-mock",
-  "version": "0.2",
+  "description": "A mock video server for testing ABR and behavior logic in video players and monitoring tools",
+  "version": "0.3.0",
+  "bin": {
+    "sluice-mock": "./bin/sluice-mock.js"
+  },
+  "repository": "github:stevenlyons/sluice-video-mock",
+  "bugs": {
+    "url": "https://github.com/stevenlyons/sluice-video-mock/issues"
+  },
+  "homepage": "https://github.com/stevenlyons/sluice-video-mock#readme",
+  "license": "MIT",
+  "keywords": ["hls", "dash", "abr", "video", "mock", "testing", "player"],
+  "files": [
+    "app.js",
+    "lib/",
+    "media/",
+    "bin/",
+    "specs/"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node app.js",
     "dev": "node --watch app.js",

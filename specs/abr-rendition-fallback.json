@@ -5,10 +5,10 @@
     { "name": "mid",  "bandwidth": 2493700, "resolution": "1280x720" },
     { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" }
   ],
-  "operations": [
-    { "op": "startup",  "delay": 2 },
-    { "op": "playback", "time": 30 },
-    { "op": "error",    "code": 404, "rendition": "high", "on": "segment" },
-    { "op": "error",    "code": 404, "rendition": "mid", "on": "segment" }
+  "timeline": [
+    { "cue": "startup",  "delay": 2 },
+    { "cue": "playback", "time": 30 },
+    { "cue": "error",    "code": 404, "rendition": "high", "on": "segment" },
+    { "cue": "error",    "code": 404, "rendition": "mid", "on": "segment" }
   ]
 }

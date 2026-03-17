@@ -5,10 +5,10 @@
     { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" },
     { "name": "low",  "bandwidth": 400000,  "resolution": "640x360" }
   ],
-  "operations": [
-    { "op": "bandwidth", "kbps": 4000 },
-    { "op": "playback", "time": 6 },
-    { "op": "error", "code": 404, "rendition": "mid" },
-    { "op": "error", "code": 404, "rendition": "low", "on": "segment" }
+  "timeline": [
+    { "cue": "bandwidth", "kbps": 4000 },
+    { "cue": "playback", "time": 6 },
+    { "cue": "error", "code": 404, "rendition": "mid" },
+    { "cue": "error", "code": 404, "rendition": "low", "on": "segment" }
   ]
 }
