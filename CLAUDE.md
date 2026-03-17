@@ -13,6 +13,7 @@ npm install        # Install dependencies
 node app.js                  # Start the server (default port 3030)
 node app.js --port 8080      # Start the server on port 8080
 node app.js -p 8080          # Same as --port
+SLUICE_PORT=8080 node app.js # Set port via environment variable
 npm start          # Same as node app.js
 ```
 

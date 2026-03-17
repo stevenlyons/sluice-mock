@@ -85,12 +85,23 @@ Then reference it by name in the URL:
 
 If no matching file is found in `specs/`, the path is treated as an inline spec string.
 
-By default the server looks for spec files in the `specs/` directory of the current working directory. You can point it at a different directory using the `--specs` flag or the `SLUICE_SPECS` environment variable:
+By default the server looks for spec files in the `specs/` directory of the current working directory. You can point it at a different directory using the `--specs` flag, the `SLUICE_SPECS` environment variable, or npm config:
 
 ```bash
 node app.js --specs /path/to/my-specs
 SLUICE_SPECS=/path/to/my-specs node app.js
+npm config set sluice-mock:specs /path/to/my-specs
 ```
+
+The port can similarly be configured via CLI flag, environment variable, or npm config:
+
+```bash
+node app.js --port 8080
+SLUICE_PORT=8080 node app.js
+npm config set sluice-mock:port 8080
+```
+
+npm config values apply whenever the server is run via `npm start` or `npm run dev`. CLI flags and environment variables always take precedence.
 
 Several example spec files are included in `specs/` to get started: `example.json`, `stall-and-recover.json`, `multiple-stalls.json`, `segment-error.json`, `network-congestion.json`, `abr-example.json`, `abr-rendition-fallback.json`, and `abr-rendition-segment-error.json`.
 

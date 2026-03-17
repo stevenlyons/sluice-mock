@@ -5,7 +5,7 @@ const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
 const app = require('./app');
-const { loadSpecification, resolveSpecsDir } = app;
+const { loadSpecification, resolveSpecsDir, resolvePort } = app;
 const { findBox } = require('./lib/logic');
 
 function readTfdt(buf) {
@@ -33,62 +33,150 @@ function get(server, path) {
 }
 
 describe('resolveSpecsDir', () => {
-  it('default: returns path.join(process.cwd(), "specs")', () => {
+  function withSpecsEnv(argv, { SLUICE_SPECS, npm_package_config_specs } = {}, fn) {
     const origArgv = process.argv;
-    const origEnv = process.env.SLUICE_SPECS;
+    const origSluice = process.env.SLUICE_SPECS;
+    const origNpm = process.env.npm_package_config_specs;
     try {
-      process.argv = ['node', 'app.js'];
-      delete process.env.SLUICE_SPECS;
-      assert.equal(resolveSpecsDir(), path.join(process.cwd(), 'specs'));
+      process.argv = argv;
+      if (SLUICE_SPECS !== undefined) process.env.SLUICE_SPECS = SLUICE_SPECS;
+      else delete process.env.SLUICE_SPECS;
+      if (npm_package_config_specs !== undefined) process.env.npm_package_config_specs = npm_package_config_specs;
+      else delete process.env.npm_package_config_specs;
+      return fn();
     } finally {
       process.argv = origArgv;
-      if (origEnv !== undefined) process.env.SLUICE_SPECS = origEnv;
+      if (origSluice !== undefined) process.env.SLUICE_SPECS = origSluice;
+      else delete process.env.SLUICE_SPECS;
+      if (origNpm !== undefined) process.env.npm_package_config_specs = origNpm;
+      else delete process.env.npm_package_config_specs;
     }
+  }
+
+  it('default: returns path.join(process.cwd(), "specs")', () => {
+    withSpecsEnv(['node', 'app.js'], {}, () => {
+      assert.equal(resolveSpecsDir(), path.join(process.cwd(), 'specs'));
+    });
   });
 
   it('--specs flag: returns resolved path from flag value', () => {
-    const origArgv = process.argv;
-    const origEnv = process.env.SLUICE_SPECS;
-    try {
-      process.argv = ['node', 'app.js', '--specs', '/tmp/my-specs'];
-      delete process.env.SLUICE_SPECS;
+    withSpecsEnv(['node', 'app.js', '--specs', '/tmp/my-specs'], {}, () => {
       assert.equal(resolveSpecsDir(), path.resolve('/tmp/my-specs'));
-    } finally {
-      process.argv = origArgv;
-      if (origEnv !== undefined) process.env.SLUICE_SPECS = origEnv;
-    }
+    });
   });
 
   it('SLUICE_SPECS env var: returns resolved path from env var', () => {
-    const origArgv = process.argv;
-    const origEnv = process.env.SLUICE_SPECS;
-    try {
-      process.argv = ['node', 'app.js'];
-      process.env.SLUICE_SPECS = '/tmp/env-specs';
+    withSpecsEnv(['node', 'app.js'], { SLUICE_SPECS: '/tmp/env-specs' }, () => {
       assert.equal(resolveSpecsDir(), path.resolve('/tmp/env-specs'));
-    } finally {
-      process.argv = origArgv;
-      if (origEnv !== undefined) process.env.SLUICE_SPECS = origEnv;
-      else delete process.env.SLUICE_SPECS;
-    }
+    });
+  });
+
+  it('npm_package_config_specs: returns resolved path from npm config', () => {
+    withSpecsEnv(['node', 'app.js'], { npm_package_config_specs: '/tmp/npm-specs' }, () => {
+      assert.equal(resolveSpecsDir(), path.resolve('/tmp/npm-specs'));
+    });
+  });
+
+  it('--specs flag takes priority over SLUICE_SPECS', () => {
+    withSpecsEnv(['node', 'app.js', '--specs', '/tmp/flag-specs'], { SLUICE_SPECS: '/tmp/env-specs' }, () => {
+      assert.equal(resolveSpecsDir(), path.resolve('/tmp/flag-specs'));
+    });
+  });
+
+  it('--specs flag takes priority over npm_package_config_specs', () => {
+    withSpecsEnv(['node', 'app.js', '--specs', '/tmp/flag-specs'], { npm_package_config_specs: '/tmp/npm-specs' }, () => {
+      assert.equal(resolveSpecsDir(), path.resolve('/tmp/flag-specs'));
+    });
+  });
+
+  it('SLUICE_SPECS takes priority over npm_package_config_specs', () => {
+    withSpecsEnv(['node', 'app.js'], { SLUICE_SPECS: '/tmp/env-specs', npm_package_config_specs: '/tmp/npm-specs' }, () => {
+      assert.equal(resolveSpecsDir(), path.resolve('/tmp/env-specs'));
+    });
   });
 
   it('loadSpecification reads from custom specsDir via SLUICE_SPECS', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sluice-test-'));
-    const origArgv = process.argv;
-    const origEnv = process.env.SLUICE_SPECS;
     try {
       const spec = { timeline: [{ cue: 'playback', time: 10 }] };
       fs.writeFileSync(path.join(tmpDir, 'custom-spec.json'), JSON.stringify(spec));
-      process.argv = ['node', 'app.js', '--specs', tmpDir];
-      delete process.env.SLUICE_SPECS;
-      const result = await loadSpecification('/custom-spec');
-      assert.deepEqual(result.timeline, spec.timeline);
+      await withSpecsEnv(['node', 'app.js', '--specs', tmpDir], {}, async () => {
+        const result = await loadSpecification('/custom-spec');
+        assert.deepEqual(result.timeline, spec.timeline);
+      });
     } finally {
-      process.argv = origArgv;
-      if (origEnv !== undefined) process.env.SLUICE_SPECS = origEnv;
       fs.rmSync(tmpDir, { recursive: true });
     }
+  });
+});
+
+describe('resolvePort', () => {
+  function withPortEnv(argv, { SLUICE_PORT, npm_package_config_port } = {}, fn) {
+    const origArgv = process.argv;
+    const origSluice = process.env.SLUICE_PORT;
+    const origNpm = process.env.npm_package_config_port;
+    try {
+      process.argv = argv;
+      if (SLUICE_PORT !== undefined) process.env.SLUICE_PORT = SLUICE_PORT;
+      else delete process.env.SLUICE_PORT;
+      if (npm_package_config_port !== undefined) process.env.npm_package_config_port = npm_package_config_port;
+      else delete process.env.npm_package_config_port;
+      return fn();
+    } finally {
+      process.argv = origArgv;
+      if (origSluice !== undefined) process.env.SLUICE_PORT = origSluice;
+      else delete process.env.SLUICE_PORT;
+      if (origNpm !== undefined) process.env.npm_package_config_port = origNpm;
+      else delete process.env.npm_package_config_port;
+    }
+  }
+
+  it('default: returns 3030', () => {
+    withPortEnv(['node', 'app.js'], {}, () => {
+      assert.equal(resolvePort(), 3030);
+    });
+  });
+
+  it('--port flag: returns parsed port', () => {
+    withPortEnv(['node', 'app.js', '--port', '8080'], {}, () => {
+      assert.equal(resolvePort(), 8080);
+    });
+  });
+
+  it('-p flag: returns parsed port', () => {
+    withPortEnv(['node', 'app.js', '-p', '9000'], {}, () => {
+      assert.equal(resolvePort(), 9000);
+    });
+  });
+
+  it('SLUICE_PORT env var: returns parsed port', () => {
+    withPortEnv(['node', 'app.js'], { SLUICE_PORT: '7070' }, () => {
+      assert.equal(resolvePort(), 7070);
+    });
+  });
+
+  it('npm_package_config_port: returns parsed port', () => {
+    withPortEnv(['node', 'app.js'], { npm_package_config_port: '4040' }, () => {
+      assert.equal(resolvePort(), 4040);
+    });
+  });
+
+  it('--port flag takes priority over SLUICE_PORT', () => {
+    withPortEnv(['node', 'app.js', '--port', '8080'], { SLUICE_PORT: '7070' }, () => {
+      assert.equal(resolvePort(), 8080);
+    });
+  });
+
+  it('--port flag takes priority over npm_package_config_port', () => {
+    withPortEnv(['node', 'app.js', '--port', '8080'], { npm_package_config_port: '4040' }, () => {
+      assert.equal(resolvePort(), 8080);
+    });
+  });
+
+  it('SLUICE_PORT takes priority over npm_package_config_port', () => {
+    withPortEnv(['node', 'app.js'], { SLUICE_PORT: '7070', npm_package_config_port: '4040' }, () => {
+      assert.equal(resolvePort(), 7070);
+    });
   });
 });
 

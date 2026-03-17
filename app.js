@@ -11,6 +11,20 @@ const { segmentLength, shouldIgnoreRequest, checkRequestType,
         extractMimetype, findBox, padSegmentBuffer } = require('./lib/logic');
 const { buildMasterPlaylist, buildRenditionPlaylist, buildDashMPD } = require('./lib/manifest');
 
+function resolvePort() {
+  const flagIndex = process.argv.findIndex(a => a === '--port' || a === '-p');
+  if (flagIndex !== -1) {
+    return parseInt(process.argv[flagIndex + 1]);
+  }
+  if (process.env.SLUICE_PORT) {
+    return parseInt(process.env.SLUICE_PORT);
+  }
+  if (process.env.npm_package_config_port) {
+    return parseInt(process.env.npm_package_config_port);
+  }
+  return 3030;
+}
+
 function resolveSpecsDir() {
   const flagIndex = process.argv.indexOf('--specs');
   if (flagIndex !== -1 && process.argv[flagIndex + 1]) {
@@ -18,6 +32,9 @@ function resolveSpecsDir() {
   }
   if (process.env.SLUICE_SPECS) {
     return path.resolve(process.env.SLUICE_SPECS);
+  }
+  if (process.env.npm_package_config_specs) {
+    return path.resolve(process.env.npm_package_config_specs);
   }
   return path.join(process.cwd(), 'specs');
 }
@@ -91,12 +108,12 @@ app.use(async ctx => {
   }
 });
 
-const portFlagIndex = process.argv.findIndex(a => a === '--port' || a === '-p');
-const port = portFlagIndex !== -1 ? parseInt(process.argv[portFlagIndex + 1]) : 3030;
+const port = resolvePort();
 if (require.main === module) app.listen(port, () => console.log(`Listening on port ${port}`));
 
 module.exports.loadSpecification = loadSpecification;
 module.exports.resolveSpecsDir = resolveSpecsDir;
+module.exports.resolvePort = resolvePort;
 
 async function loadSpecification(filepath) {
   const name = filepath.startsWith('/') ? filepath.substring(1) : filepath;

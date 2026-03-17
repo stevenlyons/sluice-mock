@@ -19,6 +19,10 @@
     "bin/",
     "specs/"
   ],
+  "config": {
+    "port": "3030",
+    "specs": "specs"
+  },
   "engines": {
     "node": ">=18"
   },
