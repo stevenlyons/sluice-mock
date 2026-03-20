@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**sluice-mock** helps simulate internet video playback for use in player integration testing. It allows the developer to specify how the video delivery and playback should behave to factilite testing and validation of the player. 
+**sluice-mock** helps simulate internet stream playback for use in player integration testing. It allows the developer to specify how the stream delivery and playback should behave to facilitate testing and validation of the player. 
 
 ## Commands
 
