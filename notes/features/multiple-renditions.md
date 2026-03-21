@@ -20,21 +20,25 @@ Result: `low` rendition (no error) used plain `seg-{n}.m4s`, while `mid`/`high` 
 ## Files to Change
 
 ### `app.js`
+
 - `generateRendition(ctx, mediaLength, renditionName, hasSegmentError)`:
   - Remove `hasSegmentError` parameter
   - Always use `seg-${renditionName}-${i+1}.m4s` when `renditionName` is set
 - Rendition case in router: remove `hasSegmentError` from `generateRendition` call
 
 ### `lib/logic.js`
+
 - `calculateElapsedPlayheadTime(filename)`:
   - Currently only matches `seg-{n}.m4s`
   - Must also match `rendition-{name}-seg-{n}.m4s` to extract segment number
 
 ### `processSegment` in `app.js`
+
 - `segMatch` regex only handles `seg-{n}` basename
   - Must also parse `rendition-{name}-seg-{n}.m4s` to get segment number
 
 ## Tests to Add / Update
+
 - `calculateElapsedPlayheadTime` — add cases for `rendition-low-seg-3.m4s`
 - `extractRenditionFromSegment` — already handles the format, no change needed
 - App-level: rendition playlist for named rendition uses rendition-named segment filenames

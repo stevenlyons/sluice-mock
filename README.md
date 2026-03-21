@@ -109,15 +109,15 @@ Named spec files support multiple renditions for testing ABR player behavior. Re
 {
   "description": "Force player to low rendition, then make it unavailable",
   "renditions": [
-    { "name": "low",  "bandwidth": 400000,  "resolution": "640x360" },
-    { "name": "mid",  "bandwidth": 2493700, "resolution": "1280x720" },
+    { "name": "low", "bandwidth": 400000, "resolution": "640x360" },
+    { "name": "mid", "bandwidth": 2493700, "resolution": "1280x720" },
     { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" }
   ],
   "timeline": [
     { "cue": "bandwidth", "kbps": 300 },
-    { "cue": "startup",   "delay": 5 },
-    { "cue": "playback",  "time": 30 },
-    { "cue": "error",     "code": 404, "rendition": "low" }
+    { "cue": "startup", "delay": 5 },
+    { "cue": "playback", "time": 30 },
+    { "cue": "error", "code": 404, "rendition": "low" }
   ]
 }
 ```
