@@ -1,7 +1,7 @@
 {
   "name": "@wirevice/sluice-mock",
   "description": "A mock stream server for testing ABR and behavior logic in media players and monitoring tools",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "bin": {
     "sluice-mock": "./bin/sluice-mock.js"
   },
