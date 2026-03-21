@@ -4,4 +4,6 @@ if (process.argv.includes('--version') || process.argv.includes('-v')) {
   console.log(version);
   process.exit(0);
 }
-require('../app.js');
+const app = require('../app.js');
+const port = app.resolvePort();
+app.listen(port, () => console.log(`Listening on port ${port}`));

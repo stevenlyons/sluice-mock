@@ -58,6 +58,21 @@ function resolveSpecsDir() {
 let specCache = {};
 let timelineCache = {};
 
+app.use(async (ctx, next) => {
+  ctx.set('Access-Control-Allow-Origin', '*');
+  ctx.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  await next();
+});
+
+app.use(async (ctx, next) => {
+  if (ctx.path === '/health') {
+    ctx.status = 200;
+    ctx.body = 'ok';
+    return;
+  }
+  await next();
+});
+
 app.use(async (ctx) => {
   const filepath = path.dirname(ctx.path);
   const filename = path.basename(ctx.path);
@@ -139,10 +154,6 @@ app.use(async (ctx) => {
     }
   }
 });
-
-const port = resolvePort();
-if (require.main === module)
-  app.listen(port, () => console.log(`Listening on port ${port}`));
 
 module.exports.loadSpecification = loadSpecification;
 module.exports.resolveSpecsDir = resolveSpecsDir;
