@@ -1,8 +1,8 @@
 {
   "description": "30s of playback ending in a 500 server error — tests player error handling",
   "timeline": [
-    { "cue": "startup",  "delay": 2 },
+    { "cue": "startup", "delay": 2 },
     { "cue": "playback", "time": 30 },
-    { "cue": "error",    "code": 500 }
+    { "cue": "error", "code": 500 }
   ]
 }

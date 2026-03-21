@@ -12,7 +12,9 @@ function readTfdt(buf) {
   const offset = findBox(buf, 'tfdt');
   if (offset === -1) return null;
   const version = buf[offset + 8];
-  return version === 1 ? Number(buf.readBigUInt64BE(offset + 12)) : buf.readUInt32BE(offset + 12);
+  return version === 1
+    ? Number(buf.readBigUInt64BE(offset + 12))
+    : buf.readUInt32BE(offset + 12);
 }
 
 // HTTP helper — makes a GET request and returns { statusCode, headers, body: Buffer }
@@ -21,19 +23,25 @@ function get(server, path) {
     const { port } = server.address();
     const req = http.get(`http://127.0.0.1:${port}${path}`, (res) => {
       const chunks = [];
-      res.on('data', chunk => chunks.push(chunk));
-      res.on('end', () => resolve({
-        statusCode: res.statusCode,
-        headers: res.headers,
-        body: Buffer.concat(chunks),
-      }));
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () =>
+        resolve({
+          statusCode: res.statusCode,
+          headers: res.headers,
+          body: Buffer.concat(chunks),
+        })
+      );
     });
     req.on('error', reject);
   });
 }
 
 describe('resolveSpecsDir', () => {
-  function withSpecsEnv(argv, { SLUICE_SPECS, npm_package_config_specs } = {}, fn) {
+  function withSpecsEnv(
+    argv,
+    { SLUICE_SPECS, npm_package_config_specs } = {},
+    fn
+  ) {
     const origArgv = process.argv;
     const origSluice = process.env.SLUICE_SPECS;
     const origNpm = process.env.npm_package_config_specs;
@@ -41,7 +49,8 @@ describe('resolveSpecsDir', () => {
       process.argv = argv;
       if (SLUICE_SPECS !== undefined) process.env.SLUICE_SPECS = SLUICE_SPECS;
       else delete process.env.SLUICE_SPECS;
-      if (npm_package_config_specs !== undefined) process.env.npm_package_config_specs = npm_package_config_specs;
+      if (npm_package_config_specs !== undefined)
+        process.env.npm_package_config_specs = npm_package_config_specs;
       else delete process.env.npm_package_config_specs;
       return fn();
     } finally {
@@ -72,38 +81,64 @@ describe('resolveSpecsDir', () => {
   });
 
   it('npm_package_config_specs: returns resolved path from npm config', () => {
-    withSpecsEnv(['node', 'app.js'], { npm_package_config_specs: '/tmp/npm-specs' }, () => {
-      assert.equal(resolveSpecsDir(), path.resolve('/tmp/npm-specs'));
-    });
+    withSpecsEnv(
+      ['node', 'app.js'],
+      { npm_package_config_specs: '/tmp/npm-specs' },
+      () => {
+        assert.equal(resolveSpecsDir(), path.resolve('/tmp/npm-specs'));
+      }
+    );
   });
 
   it('--specs flag takes priority over SLUICE_SPECS', () => {
-    withSpecsEnv(['node', 'app.js', '--specs', '/tmp/flag-specs'], { SLUICE_SPECS: '/tmp/env-specs' }, () => {
-      assert.equal(resolveSpecsDir(), path.resolve('/tmp/flag-specs'));
-    });
+    withSpecsEnv(
+      ['node', 'app.js', '--specs', '/tmp/flag-specs'],
+      { SLUICE_SPECS: '/tmp/env-specs' },
+      () => {
+        assert.equal(resolveSpecsDir(), path.resolve('/tmp/flag-specs'));
+      }
+    );
   });
 
   it('--specs flag takes priority over npm_package_config_specs', () => {
-    withSpecsEnv(['node', 'app.js', '--specs', '/tmp/flag-specs'], { npm_package_config_specs: '/tmp/npm-specs' }, () => {
-      assert.equal(resolveSpecsDir(), path.resolve('/tmp/flag-specs'));
-    });
+    withSpecsEnv(
+      ['node', 'app.js', '--specs', '/tmp/flag-specs'],
+      { npm_package_config_specs: '/tmp/npm-specs' },
+      () => {
+        assert.equal(resolveSpecsDir(), path.resolve('/tmp/flag-specs'));
+      }
+    );
   });
 
   it('SLUICE_SPECS takes priority over npm_package_config_specs', () => {
-    withSpecsEnv(['node', 'app.js'], { SLUICE_SPECS: '/tmp/env-specs', npm_package_config_specs: '/tmp/npm-specs' }, () => {
-      assert.equal(resolveSpecsDir(), path.resolve('/tmp/env-specs'));
-    });
+    withSpecsEnv(
+      ['node', 'app.js'],
+      {
+        SLUICE_SPECS: '/tmp/env-specs',
+        npm_package_config_specs: '/tmp/npm-specs',
+      },
+      () => {
+        assert.equal(resolveSpecsDir(), path.resolve('/tmp/env-specs'));
+      }
+    );
   });
 
   it('loadSpecification reads from custom specsDir via SLUICE_SPECS', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sluice-test-'));
     try {
       const spec = { timeline: [{ cue: 'playback', time: 10 }] };
-      fs.writeFileSync(path.join(tmpDir, 'custom-spec.json'), JSON.stringify(spec));
-      await withSpecsEnv(['node', 'app.js', '--specs', tmpDir], {}, async () => {
-        const result = await loadSpecification('/custom-spec');
-        assert.deepEqual(result.timeline, spec.timeline);
-      });
+      fs.writeFileSync(
+        path.join(tmpDir, 'custom-spec.json'),
+        JSON.stringify(spec)
+      );
+      await withSpecsEnv(
+        ['node', 'app.js', '--specs', tmpDir],
+        {},
+        async () => {
+          const result = await loadSpecification('/custom-spec');
+          assert.deepEqual(result.timeline, spec.timeline);
+        }
+      );
     } finally {
       fs.rmSync(tmpDir, { recursive: true });
     }
@@ -111,7 +146,11 @@ describe('resolveSpecsDir', () => {
 });
 
 describe('resolvePort', () => {
-  function withPortEnv(argv, { SLUICE_PORT, npm_package_config_port } = {}, fn) {
+  function withPortEnv(
+    argv,
+    { SLUICE_PORT, npm_package_config_port } = {},
+    fn
+  ) {
     const origArgv = process.argv;
     const origSluice = process.env.SLUICE_PORT;
     const origNpm = process.env.npm_package_config_port;
@@ -119,7 +158,8 @@ describe('resolvePort', () => {
       process.argv = argv;
       if (SLUICE_PORT !== undefined) process.env.SLUICE_PORT = SLUICE_PORT;
       else delete process.env.SLUICE_PORT;
-      if (npm_package_config_port !== undefined) process.env.npm_package_config_port = npm_package_config_port;
+      if (npm_package_config_port !== undefined)
+        process.env.npm_package_config_port = npm_package_config_port;
       else delete process.env.npm_package_config_port;
       return fn();
     } finally {
@@ -162,30 +202,47 @@ describe('resolvePort', () => {
   });
 
   it('--port flag takes priority over SLUICE_PORT', () => {
-    withPortEnv(['node', 'app.js', '--port', '8080'], { SLUICE_PORT: '7070' }, () => {
-      assert.equal(resolvePort(), 8080);
-    });
+    withPortEnv(
+      ['node', 'app.js', '--port', '8080'],
+      { SLUICE_PORT: '7070' },
+      () => {
+        assert.equal(resolvePort(), 8080);
+      }
+    );
   });
 
   it('--port flag takes priority over npm_package_config_port', () => {
-    withPortEnv(['node', 'app.js', '--port', '8080'], { npm_package_config_port: '4040' }, () => {
-      assert.equal(resolvePort(), 8080);
-    });
+    withPortEnv(
+      ['node', 'app.js', '--port', '8080'],
+      { npm_package_config_port: '4040' },
+      () => {
+        assert.equal(resolvePort(), 8080);
+      }
+    );
   });
 
   it('SLUICE_PORT takes priority over npm_package_config_port', () => {
-    withPortEnv(['node', 'app.js'], { SLUICE_PORT: '7070', npm_package_config_port: '4040' }, () => {
-      assert.equal(resolvePort(), 7070);
-    });
+    withPortEnv(
+      ['node', 'app.js'],
+      { SLUICE_PORT: '7070', npm_package_config_port: '4040' },
+      () => {
+        assert.equal(resolvePort(), 7070);
+      }
+    );
   });
 });
 
 describe('mfhd sequence_number patching', () => {
   let server;
-  before(() => new Promise(resolve => {
-    server = http.createServer(app.callback()).listen(0, '127.0.0.1', resolve);
-  }));
-  after(() => new Promise(resolve => server.close(resolve)));
+  before(
+    () =>
+      new Promise((resolve) => {
+        server = http
+          .createServer(app.callback())
+          .listen(0, '127.0.0.1', resolve);
+      })
+  );
+  after(() => new Promise((resolve) => server.close(resolve)));
 
   it('seg-1.m4s has sequence_number 1 at byte offset 20', async () => {
     const { statusCode, body } = await get(server, '/p30/seg-1.m4s');
@@ -211,8 +268,10 @@ describe('mfhd sequence_number patching', () => {
       get(server, '/p30/seg-6.m4s'),
     ]);
     // mfhd sequence_number: bytes 20–23 (fixed position)
-    assert.deepEqual(r1.body.slice(24, findBox(r1.body, 'tfdt') + 12),
-                     r6.body.slice(24, findBox(r6.body, 'tfdt') + 12));
+    assert.deepEqual(
+      r1.body.slice(24, findBox(r1.body, 'tfdt') + 12),
+      r6.body.slice(24, findBox(r6.body, 'tfdt') + 12)
+    );
     // after tfdt baseMediaDecodeTime field (version=1: 8-byte field at offset +12)
     const afterTfdt1 = findBox(r1.body, 'tfdt') + 20;
     const afterTfdt6 = findBox(r6.body, 'tfdt') + 20;
@@ -234,7 +293,10 @@ describe('mfhd sequence_number patching', () => {
     assert.ok(body.length > 0);
     // Verify it starts with ftyp or moov box (4-byte size + 4-byte type)
     const boxType = body.slice(4, 8).toString('ascii');
-    assert.ok(boxType === 'ftyp' || boxType === 'moov', `expected ftyp or moov, got ${boxType}`);
+    assert.ok(
+      boxType === 'ftyp' || boxType === 'moov',
+      `expected ftyp or moov, got ${boxType}`
+    );
   });
 
   it('seg-1.m4s content-type is video/iso.segment', async () => {
@@ -266,32 +328,49 @@ describe('mfhd sequence_number patching', () => {
 describe('per-rendition segment sizing', () => {
   // Use abr-sizing-test (playback only, no throttle or errors) so Content-Length is preserved.
   let server;
-  before(() => new Promise(resolve => {
-    server = http.createServer(app.callback()).listen(0, '127.0.0.1', resolve);
-  }));
-  after(() => new Promise(resolve => server.close(resolve)));
+  before(
+    () =>
+      new Promise((resolve) => {
+        server = http
+          .createServer(app.callback())
+          .listen(0, '127.0.0.1', resolve);
+      })
+  );
+  after(() => new Promise((resolve) => server.close(resolve)));
 
   it('seg-low-1.m4s response body is padded to low rendition target size', async () => {
-    const { statusCode, body } = await get(server, '/abr-sizing-test/seg-low-1.m4s');
+    const { statusCode, body } = await get(
+      server,
+      '/abr-sizing-test/seg-low-1.m4s'
+    );
     assert.equal(statusCode, 200);
-    const targetBytes = Math.round(600000 * 6.006 / 8);
+    const targetBytes = Math.round((600000 * 6.006) / 8);
     assert.equal(body.length, targetBytes);
   });
 
   it('seg-high-1.m4s response body is padded to high rendition target size', async () => {
-    const { statusCode, body } = await get(server, '/abr-sizing-test/seg-high-1.m4s');
+    const { statusCode, body } = await get(
+      server,
+      '/abr-sizing-test/seg-high-1.m4s'
+    );
     assert.equal(statusCode, 200);
-    const targetBytes = Math.round(5000000 * 6.006 / 8);
+    const targetBytes = Math.round((5000000 * 6.006) / 8);
     assert.equal(body.length, targetBytes);
   });
 
   it('content-length header matches actual body size for low rendition', async () => {
-    const { headers, body } = await get(server, '/abr-sizing-test/seg-low-1.m4s');
+    const { headers, body } = await get(
+      server,
+      '/abr-sizing-test/seg-low-1.m4s'
+    );
     assert.equal(parseInt(headers['content-length']), body.length);
   });
 
   it('content-length header matches actual body size for high rendition', async () => {
-    const { headers, body } = await get(server, '/abr-sizing-test/seg-high-1.m4s');
+    const { headers, body } = await get(
+      server,
+      '/abr-sizing-test/seg-high-1.m4s'
+    );
     assert.equal(parseInt(headers['content-length']), body.length);
   });
 
@@ -375,12 +454,15 @@ describe('loadSpecification', () => {
 
   it('resolves segment rendition errors from abr-rendition-segment-error', async () => {
     const spec = await loadSpecification('/abr-rendition-segment-error');
-    assert.deepEqual(spec.renditionErrors, { playlist: {}, segment: { low: { code: 503, activateAtSegment: 6 } } });
+    assert.deepEqual(spec.renditionErrors, {
+      playlist: {},
+      segment: { low: { code: 503, activateAtSegment: 6 } },
+    });
   });
 
   it('timeline includes rendition-targeted error cues for media length calculation', async () => {
     const spec = await loadSpecification('/abr-example');
-    const hasRenditionCue = spec.timeline.some(cue => cue.rendition);
+    const hasRenditionCue = spec.timeline.some((cue) => cue.rendition);
     assert.equal(hasRenditionCue, true);
   });
 });

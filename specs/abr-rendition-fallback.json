@@ -1,14 +1,14 @@
 {
   "description": "High and mid renditions unavailable — player must fall back to low",
   "renditions": [
-    { "name": "low",  "bandwidth": 400000,  "resolution": "640x360" },
-    { "name": "mid",  "bandwidth": 2493700, "resolution": "1280x720" },
+    { "name": "low", "bandwidth": 400000, "resolution": "640x360" },
+    { "name": "mid", "bandwidth": 2493700, "resolution": "1280x720" },
     { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" }
   ],
   "timeline": [
-    { "cue": "startup",  "delay": 2 },
+    { "cue": "startup", "delay": 2 },
     { "cue": "playback", "time": 30 },
-    { "cue": "error",    "code": 404, "rendition": "high", "on": "segment" },
-    { "cue": "error",    "code": 404, "rendition": "mid", "on": "segment" }
+    { "cue": "error", "code": 404, "rendition": "high", "on": "segment" },
+    { "cue": "error", "code": 404, "rendition": "mid", "on": "segment" }
   ]
 }
