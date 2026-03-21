@@ -102,9 +102,12 @@ app.use(async ctx => {
       await processSegment(ctx, timeline, time, filename, renditionBandwidth);
       break;
     }
-    default:
-      await outputFile(ctx, '/media', filename);
+    default: {
+      const ext = path.extname(filename);
+      const folder = ['.ts', '.mp4'].includes(ext) ? '/media' : '/static';
+      await outputFile(ctx, folder, filename);
       break;
+    }
   }
 });
 

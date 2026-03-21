@@ -16,8 +16,7 @@
     "app.js",
     "lib/",
     "media/",
-    "bin/",
-    "specs/"
+    "bin/"
   ],
   "config": {
     "port": "3030",
