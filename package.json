@@ -3,9 +3,12 @@
   "description": "A mock stream server for testing ABR and behavior logic in media players and monitoring tools",
   "version": "0.3.2",
   "bin": {
-    "sluice-mock": "./bin/sluice-mock.js"
+    "sluice-mock": "bin/sluice-mock.js"
   },
-  "repository": "github:stevenlyons/sluice-mock",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stevenlyons/sluice-mock.git"
+  },
   "bugs": {
     "url": "https://github.com/stevenlyons/sluice-mock/issues"
   },
