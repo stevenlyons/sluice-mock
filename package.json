@@ -37,8 +37,8 @@
     "node": ">=18"
   },
   "scripts": {
-    "start": "node app.js",
-    "dev": "node --watch app.js",
+    "start": "node bin/sluice-mock.js",
+    "dev": "node --watch bin/sluice-mock.js",
     "test": "node --test lib/logic.test.js lib/manifest.test.js app.test.js",
     "lint": "eslint .",
     "format": "prettier --write .",

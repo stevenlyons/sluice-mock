@@ -10,11 +10,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 pnpm install       # Install dependencies
-node app.js                  # Start the server (default port 3030)
-node app.js --port 8080      # Start the server on port 8080
-node app.js -p 8080          # Same as --port
-SLUICE_PORT=8080 node app.js # Set port via environment variable
-pnpm start         # Same as node app.js
+node bin/sluice-mock.js                  # Start the server (default port 3030)
+node bin/sluice-mock.js --port 8080      # Start the server on port 8080
+node bin/sluice-mock.js -p 8080          # Same as --port
+SLUICE_PORT=8080 node bin/sluice-mock.js # Set port via environment variable
+pnpm start                               # Same as node bin/sluice-mock.js
 ```
 
 Tests use the Node.js built-in test runner (`node --test`). Run with:
