@@ -1,0 +1,11 @@
+{
+  "description": "High rendition unavailable from the start — player must never use it",
+  "renditions": [
+    { "name": "low", "bandwidth": 400000, "resolution": "640x360" },
+    { "name": "high", "bandwidth": 5000000, "resolution": "1920x1080" }
+  ],
+  "timeline": [
+    { "cue": "playback", "time": 30 },
+    { "cue": "error", "code": 403, "rendition": "high", "on": "playlist" }
+  ]
+}

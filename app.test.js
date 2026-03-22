@@ -466,3 +466,45 @@ describe('loadSpecification', () => {
     assert.equal(hasRenditionCue, true);
   });
 });
+
+describe('error responses', () => {
+  let server;
+  before(
+    () =>
+      new Promise((resolve) => {
+        server = http
+          .createServer(app.callback())
+          .listen(0, '127.0.0.1', resolve);
+      })
+  );
+  after(() => new Promise((resolve) => server.close(resolve)));
+
+  it('inline spec segment error returns the specified status code', async () => {
+    // p30-e404: error at timeline segment 5; triggered by seg-6 (elapsed time = (6-1)*6.006 → segmentNum 5)
+    const { statusCode } = await get(server, '/p30-e404/seg-6.m4s');
+    assert.equal(statusCode, 404);
+  });
+
+  it('named spec rendition segment error returns the specified status code', async () => {
+    // abr-rendition-segment-error: low rendition segments return 503 from segment 6 onward
+    const { statusCode } = await get(
+      server,
+      '/abr-rendition-segment-error/seg-low-6.m4s'
+    );
+    assert.equal(statusCode, 503);
+  });
+
+  it('named spec rendition playlist error returns the specified status code', async () => {
+    // rendition-playlist-error: high rendition playlist returns 403
+    const { statusCode } = await get(
+      server,
+      '/rendition-playlist-error/rendition-high.m3u8'
+    );
+    assert.equal(statusCode, 403);
+  });
+
+  it('error responses include CORS headers', async () => {
+    const { headers } = await get(server, '/p30-e404/seg-5.m4s');
+    assert.equal(headers['access-control-allow-origin'], '*');
+  });
+});
