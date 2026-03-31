@@ -58,7 +58,7 @@ Two modes via `koa-throttle2`:
 
 ### Key constants
 
-* `segmentLength = 6.006` seconds — all segment math derives from this
+* `segmentLength = 2.002` seconds — all segment math derives from this
 
 ## Tests
 

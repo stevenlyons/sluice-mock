@@ -48,6 +48,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "big.js": "^7.0.1",
     "koa": "^3.1.2",
     "koa-throttle2": "^3.1.8"
   },

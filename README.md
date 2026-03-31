@@ -28,7 +28,7 @@ Open the URL `http://localhost:3030/p30/media.m3u8`, or any described below, in 
 
 | Method | Port | Specs directory |
 |---|---|---|
-| CLI flag | `--port 8080` or `-p 8080` | `--specs ./my-specs` |
+| CLI flag | `--port 3031` or `-p 3031` | `--specs ./my-specs` |
 | Environment variable | `SLUICE_PORT=8080` | `SLUICE_SPECS=./my-specs` |
 
 CLI flags and environment variables take precedence in that order. By default the server runs on port `3030` and looks for spec files in the `specs/` directory of the current working directory.

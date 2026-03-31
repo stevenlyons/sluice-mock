@@ -90,9 +90,9 @@ rendition-high.m3u8
 ```
 #EXTM3U
 ...
-#EXTINF:6.006,
+#EXTINF:2.002,
 seg-low-1.m4s
-#EXTINF:6.006,
+#EXTINF:2.002,
 seg-low-2.m4s
 ...
 #EXT-X-ENDLIST
