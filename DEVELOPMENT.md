@@ -60,6 +60,33 @@ Two modes via `koa-throttle2`:
 
 * `segmentLength = 2.002` seconds — all segment math derives from this
 
+## Publishing to npm
+
+The package is published as `@wirevice/sluice-mock`.
+
+1. Ensure tests pass: `pnpm test`
+2. Bump the version:
+
+```bash
+pnpm version patch   # 0.3.4 → 0.3.5
+pnpm version minor   # 0.3.4 → 0.4.0
+pnpm version major   # 0.3.4 → 1.0.0
+```
+
+3. Verify the package contents:
+
+```bash
+pnpm pack --dry-run
+```
+
+4. Publish:
+
+```bash
+pnpm publish --access public
+```
+
+> Requires being logged in (`npm login`) and having publish access to the `@wirevice` org.
+
 ## Tests
 
 Tests use the Node.js built-in test runner and are colocated with the files they cover:
