@@ -4,6 +4,7 @@ const { Readable } = require('stream');
 const app = (module.exports = new Koa());
 const path = require('path');
 const throttle = require('koa-throttle2');
+const Big = require('big.js');
 const {
   segmentLength,
   shouldIgnoreRequest,
@@ -25,6 +26,7 @@ const {
   buildRenditionPlaylist,
   buildDashMPD,
 } = require('./lib/manifest');
+const SEG = new Big(segmentLength);
 
 function resolvePort() {
   const flagIndex = process.argv.findIndex((a) => a === '--port' || a === '-p');
@@ -195,7 +197,7 @@ async function processSegment(
 ) {
   if (!timeline || time === undefined) return;
 
-  const segmentNum = Math.ceil(time / segmentLength);
+  const segmentNum = Number(new Big(time).div(SEG).round(0, 3));
   const segment = timeline.find((el) => el.segment === segmentNum);
 
   const ext = path.extname(requestedFilename);
@@ -258,14 +260,14 @@ function patchM4sBuffer(buf, sequenceNumber, renditionBandwidth) {
   buf.writeUInt32BE(sequenceNumber, 20);
   // Patch the tfdt baseMediaDecodeTime so each segment starts at the right point
   // in the timeline regardless of which physical file is being served.
-  // 24000 (timescale) * 6.006s (segment duration) = 144144 ticks per segment
+  // 24000 (timescale) * 2.002s (segment duration) = 48048 ticks per segment
   const tfdtOffset = findBox(buf, 'tfdt');
   if (tfdtOffset !== -1) {
-    const decodeTime = BigInt(144144) * BigInt(sequenceNumber - 1);
+    const decodeTime = BigInt(SEG.mul(24000).toNumber()) * BigInt(sequenceNumber - 1);
     buf.writeBigUInt64BE(decodeTime, tfdtOffset + 12); // version=1, 64-bit field
   }
   if (renditionBandwidth) {
-    const targetBytes = Math.round((renditionBandwidth * segmentLength) / 8);
+    const targetBytes = Math.round((renditionBandwidth * SEG.toNumber()) / 8);
     buf = padSegmentBuffer(buf, targetBytes);
   }
   return buf;

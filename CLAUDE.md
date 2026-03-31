@@ -104,5 +104,5 @@ Two throttle modes via `koa-throttle2` (not `sleep`):
 
 ### Key Constants
 
-- `segmentLength = 6.006` (seconds) — hardcoded; all segment math derives from this
+- `segmentLength = 2.002` (seconds) — hardcoded; all segment math derives from this
 - HLS segment requests (`*.ts`) physically serve `media/0.ts`; DASH segment requests (`*.m4s`) physically serve `media/0.m4s`

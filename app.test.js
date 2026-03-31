@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const app = require('./app');
 const { loadSpecification, resolveSpecsDir, resolvePort } = app;
-const { findBox } = require('./lib/logic');
+const { findBox, segmentLength } = require('./lib/logic');
 
 function readTfdt(buf) {
   const offset = findBox(buf, 'tfdt');
@@ -309,19 +309,19 @@ describe('mfhd sequence_number patching', () => {
     assert.equal(readTfdt(body), 0);
   });
 
-  it('seg-2.m4s has base media decode time 144144', async () => {
+  it('seg-2.m4s has base media decode time 48048', async () => {
     const { body } = await get(server, '/p30/seg-2.m4s');
-    assert.equal(readTfdt(body), 144144);
+    assert.equal(readTfdt(body), 48048);
   });
 
-  it('seg-3.m4s has base media decode time 288288 (corrected from physical file)', async () => {
+  it('seg-3.m4s has base media decode time 96096 (corrected from physical file)', async () => {
     const { body } = await get(server, '/p30/seg-3.m4s');
-    assert.equal(readTfdt(body), 288288);
+    assert.equal(readTfdt(body), 96096);
   });
 
-  it('seg-6.m4s has base media decode time 720720 (looped)', async () => {
+  it('seg-6.m4s has base media decode time 240240 (looped)', async () => {
     const { body } = await get(server, '/p30/seg-6.m4s');
-    assert.equal(readTfdt(body), 144144 * 5);
+    assert.equal(readTfdt(body), 48048 * 5);
   });
 });
 
@@ -344,7 +344,7 @@ describe('per-rendition segment sizing', () => {
       '/abr-sizing-test/seg-low-1.m4s'
     );
     assert.equal(statusCode, 200);
-    const targetBytes = Math.round((600000 * 6.006) / 8);
+    const targetBytes = Math.round((1500000 * segmentLength) / 8);
     assert.equal(body.length, targetBytes);
   });
 
@@ -354,7 +354,7 @@ describe('per-rendition segment sizing', () => {
       '/abr-sizing-test/seg-high-1.m4s'
     );
     assert.equal(statusCode, 200);
-    const targetBytes = Math.round((5000000 * 6.006) / 8);
+    const targetBytes = Math.round((5000000 * segmentLength) / 8);
     assert.equal(body.length, targetBytes);
   });
 
@@ -446,8 +446,8 @@ describe('loadSpecification', () => {
     assert.deepEqual(spec.renditionErrors, {
       playlist: {},
       segment: {
-        mid: { code: 404, activateAtSegment: 2 },
-        low: { code: 404, activateAtSegment: 3 },
+        mid: { code: 404, activateAtSegment: 4 },
+        low: { code: 404, activateAtSegment: 5 },
       },
     });
   });
@@ -456,7 +456,7 @@ describe('loadSpecification', () => {
     const spec = await loadSpecification('/abr-rendition-segment-error');
     assert.deepEqual(spec.renditionErrors, {
       playlist: {},
-      segment: { low: { code: 503, activateAtSegment: 6 } },
+      segment: { low: { code: 503, activateAtSegment: 16 } },
     });
   });
 
@@ -480,16 +480,16 @@ describe('error responses', () => {
   after(() => new Promise((resolve) => server.close(resolve)));
 
   it('inline spec segment error returns the specified status code', async () => {
-    // p30-e404: error at timeline segment 5; triggered by seg-6 (elapsed time = (6-1)*6.006 → segmentNum 5)
-    const { statusCode } = await get(server, '/p30-e404/seg-6.m4s');
+    // p30-e404: error at timeline segment 15; triggered by seg-16 (elapsed time = (16-1)*segmentLength → segmentNum 15)
+    const { statusCode } = await get(server, '/p30-e404/seg-16.m4s');
     assert.equal(statusCode, 404);
   });
 
   it('named spec rendition segment error returns the specified status code', async () => {
-    // abr-rendition-segment-error: low rendition segments return 503 from segment 6 onward
+    // abr-rendition-segment-error: low rendition segments return 503 from segment 16 onward
     const { statusCode } = await get(
       server,
-      '/abr-rendition-segment-error/seg-low-6.m4s'
+      '/abr-rendition-segment-error/seg-low-16.m4s'
     );
     assert.equal(statusCode, 503);
   });
