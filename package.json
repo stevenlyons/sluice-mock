@@ -41,7 +41,7 @@
   },
   "scripts": {
     "start": "node bin/sluice-mock.js",
-    "dev": "node --watch --watch-path=specs bin/sluice-mock.js",
+    "dev": "node --watch-path=bin --watch-path=app.js --watch-path=lib --watch-path=specs bin/sluice-mock.js",
     "test": "node --test lib/logic.test.js lib/manifest.test.js app.test.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
