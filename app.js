@@ -300,23 +300,54 @@ async function outputFile(
     ) {
       let buf = await fs.promises.readFile(fpath);
       buf = patchM4sBuffer(buf, sequenceNumber, renditionBandwidth);
-      ctx.length = buf.length;
-      ctx.body = Readable.from(buf);
+
+      if (delay > 0 || bandwidthKbps > 0) {
+        // koa-throttle2 replaces ctx.body with a new stream, which causes Koa's
+        // body setter to strip Content-Length. Shaka requires Content-Length on
+        // segment responses; bypass koa-throttle2 and write chunks manually.
+        const chunkSize =
+          delay > 0
+            ? Math.ceil(buf.length / 10 / delay)
+            : Math.ceil((bandwidthKbps * 1000) / 8 / 10);
+        ctx.res.statusCode = 200;
+        ctx.res.setHeader('Content-Length', buf.length);
+        ctx.respond = false;
+        try {
+          let offset = 0;
+          while (offset < buf.length) {
+            const end = Math.min(offset + chunkSize, buf.length);
+            await new Promise((resolve, reject) =>
+              ctx.res.write(buf.slice(offset, end), (err) =>
+                err ? reject(err) : resolve()
+              )
+            );
+            offset = end;
+            if (offset < buf.length)
+              await new Promise((r) => setTimeout(r, 100));
+          }
+          ctx.res.end();
+        } catch {
+          // Client disconnected mid-stream (e.g. ABR player cancelled the request)
+        }
+      } else {
+        ctx.length = buf.length;
+        ctx.body = Readable.from(buf);
+      }
     } else {
       ctx.length = fstat.size;
       ctx.body = fs.createReadStream(fpath);
-    }
 
-    if (delay > 0) {
-      // Calculate the number of bytes per 100ms interval to throttle the file to the specified time
-      const chunk = ctx.length / 10 / delay;
-      const throttler = throttle({ rate: 100, chunk: chunk });
-      await throttler(ctx, () => {});
-    } else if (bandwidthKbps > 0) {
-      // Throttle to the specified kbps: bytes per 100ms interval
-      const chunk = (bandwidthKbps * 1000) / 8 / 10;
-      const throttler = throttle({ rate: 100, chunk: chunk });
-      await throttler(ctx, () => {});
+      if (delay > 0) {
+        // Calculate the number of bytes per 100ms interval to throttle the file to the specified time
+        const chunk = ctx.length / 10 / delay;
+        const throttler = throttle({ rate: 100, chunk: chunk });
+        await throttler(ctx, () => {});
+      } else if (bandwidthKbps > 0) {
+        // Throttle to the specified kbps: bytes per 100ms interval
+        const chunk = (bandwidthKbps * 1000) / 8 / 10;
+        const throttler = throttle({ rate: 100, chunk: chunk });
+        await throttler(ctx, () => {});
+      }
     }
   }
 }
